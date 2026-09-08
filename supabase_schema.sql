@@ -112,7 +112,8 @@ update public.profiles p set role = 'admin' from auth.users u join public.admin_
 
 -- 게시글 사진은 서버가 Service Role로만 업로드합니다.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('post-images', 'post-images', true, 5242880, array['image/jpeg','image/png','image/webp'])
+values ('post-images', 'post-images', true, 52428800, array['image/jpeg','image/png','image/webp'])
 on conflict (id) do nothing;
+update storage.buckets set file_size_limit = 52428800 where id = 'post-images';
 
 notify pgrst, 'reload schema';

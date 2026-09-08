@@ -138,12 +138,12 @@ def storage_request(url, key, name, binary, mime_type):
         f"{url}/storage/v1/object/post-images/{name}", data=binary, method="POST",
         headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": mime_type, "x-upsert": "false"},
     )
-    with urllib.request.urlopen(request, timeout=25):
+    with urllib.request.urlopen(request, timeout=90):
         pass
 
 def ensure_post_image_bucket(url, key):
     """초기 SQL이 아직 적용되지 않은 배포에서도 사진 버킷을 한 번 자동 준비한다."""
-    payload = json.dumps({"id": "post-images", "name": "post-images", "public": True, "file_size_limit": 5 * 1024 * 1024, "allowed_mime_types": ["image/jpeg", "image/png", "image/webp"]}).encode("utf-8")
+    payload = json.dumps({"id": "post-images", "name": "post-images", "public": True, "file_size_limit": 50 * 1024 * 1024, "allowed_mime_types": ["image/jpeg", "image/png", "image/webp"]}).encode("utf-8")
     request = urllib.request.Request(
         f"{url}/storage/v1/bucket", data=payload, method="POST",
         headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"},
@@ -180,7 +180,7 @@ def upload_post_image(data_url):
     match = re.match(r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$", data_url or "")
     if not match: raise RuntimeError("JPG, PNG, WEBP 이미지만 업로드할 수 있습니다.")
     binary = base64.b64decode(match.group(2), validate=True)
-    if len(binary) > 5 * 1024 * 1024: raise RuntimeError("사진은 5MB 이하만 업로드할 수 있습니다.")
+    if len(binary) > 50 * 1024 * 1024: raise RuntimeError("사진은 50MB 이하만 업로드할 수 있습니다.")
     url = supabase_base_url()
     key = supabase_value("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERV_ROLE_KEY")
     suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[match.group(1)]
@@ -840,7 +840,9 @@ class Handler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/community/"):
             user = self.require_user()
             if not user: return
-            if int(self.headers.get("Content-Length", "0")) > 7 * 1024 * 1024:
+            # Base64 전송은 원본 파일보다 약 33% 커진다. 사진 업로드만 50MB 원본을 허용한다.
+            max_request_size = 72 * 1024 * 1024 if self.path.endswith("/upload") else 7 * 1024 * 1024
+            if int(self.headers.get("Content-Length", "0")) > max_request_size:
                 return self.send_json({"error": "요청 데이터가 너무 큽니다."}, 413)
             try:
                 length = int(self.headers.get("Content-Length", "0"))

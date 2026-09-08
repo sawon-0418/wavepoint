@@ -180,7 +180,7 @@ $('#new-post-button').addEventListener('click', () => { if(!currentSpot) return;
 $('#report-spot-button').addEventListener('click', () => { if(currentSpot) openReport('spot', currentSpot.id); });
 $('#open-inquiry-modal').addEventListener('click', () => $('#inquiry-modal').showModal());
 async function apiError(response, fallback) { try { const result = await response.json(); return result.error || fallback; } catch { return fallback; } }
-async function imageDataUrl(file) { if(!file || !file.size) throw new Error('사진을 선택해 주세요.'); if(file.size > 5 * 1024 * 1024) throw new Error('사진은 5MB 이하만 업로드할 수 있습니다.'); return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}); }
+async function imageDataUrl(file) { if(!file || !file.size) throw new Error('사진을 선택해 주세요.'); if(file.size > 50 * 1024 * 1024) throw new Error('사진은 50MB 이하만 업로드할 수 있습니다.'); return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}); }
 async function uploadPostImage(file) { if(!file || !file.size) return ''; const dataUrl=await imageDataUrl(file); const response=await fetch('/api/community/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl})}); if(!response.ok) throw new Error(await apiError(response,'사진 업로드에 실패했습니다.')); return (await response.json()).imageUrl; }
 function setupImagePreview(inputId, previewId) {
   const input = $(`#${inputId}`), preview = $(`#${previewId}`), image = preview.querySelector('img');
