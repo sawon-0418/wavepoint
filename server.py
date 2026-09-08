@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import base64
+import hmac
 import os
 import re
 import threading
@@ -650,6 +651,15 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
+        if self.path == "/api/cron-sync":
+            # GitHub Actions가 예약 시간에만 호출하는 별도 동기화 진입점이다.
+            # 사용자 세션 대신 두 환경에만 저장된 긴 임의 토큰을 비교한다.
+            expected_token = os.environ.get("CRON_SYNC_TOKEN", "")
+            provided_token = self.headers.get("X-Cron-Sync-Token", "")
+            if len(expected_token) < 32 or not hmac.compare_digest(provided_token, expected_token):
+                return self.send_json({"error": "예약 동기화 권한이 없습니다."}, 403)
+            result = sync_all()
+            return self.send_json(result, 200 if not result["errors"] else 502)
         if self.path.startswith("/api/auth/"):
             action = self.path.rsplit("/", 1)[-1]
             try:

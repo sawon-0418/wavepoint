@@ -16,24 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      FISHING_SPOTS_API_KEY: ${{ secrets.FISHING_SPOTS_API_KEY }}
-      FISHING_SPOTS_API_URL: ${{ secrets.FISHING_SPOTS_API_URL }}
-      PROTECTED_AREAS_API_KEY: ${{ secrets.PROTECTED_AREAS_API_KEY }}
-      PROTECTED_AREAS_WFS_URL: ${{ secrets.PROTECTED_AREAS_WFS_URL }}
-      PROTECTED_AREAS_WMS_URL: ${{ secrets.PROTECTED_AREAS_WMS_URL }}
-      PROTECTED_AREAS_BBOX: ${{ secrets.PROTECTED_AREAS_BBOX }}
-      NAVER_MAPS_NCP_KEY_ID: ${{ secrets.NAVER_MAPS_NCP_KEY_ID }}
-      NAVER_MAPS_CLIENT_SECRET: ${{ secrets.NAVER_MAPS_CLIENT_SECRET }}
+      WAVEPOINT_SYNC_URL: ${{ secrets.WAVEPOINT_SYNC_URL }}
+      CRON_SYNC_TOKEN: ${{ secrets.CRON_SYNC_TOKEN }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Run official data sync
-        run: python sync_job.py
+      - name: Trigger secure Render sync
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 600 \
+            --request POST "$WAVEPOINT_SYNC_URL" \
+            --header "X-Cron-Sync-Token: $CRON_SYNC_TOKEN"

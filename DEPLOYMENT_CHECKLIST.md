@@ -21,8 +21,9 @@
 - `/api/sync`, `/api/migrate-to-supabase`, `/api/admin/*`은 운영자 로그인 계정에서만 정상 동작하는지 확인한다.
 - 게시글·포인트·신고·문의 등록 제한이 HTTP 429로 동작하는지 확인한다.
 - 숨김 처리한 게시글/포인트가 지도·상세·조과 랭킹에서 모두 사라지고, 숨김 해제 후 다시 보이는지 확인한다.
-- GitHub Actions의 `Daily official data sync`는 `30 18 * * *`(UTC, 매일 03:30 KST)에 실행된다. GitHub 저장소 Settings → Secrets and variables → Actions에 Supabase·공공데이터·네이버 지도 키를 등록한다.
-- 배포 직후 GitHub Actions → `Daily official data sync` → Run workflow로 한 번 수동 실행하고, 로그에서 `공식 데이터 동기화가 완료됐습니다.`를 확인한다.
+- GitHub Actions의 `Daily official data sync`는 `30 18 * * *`(UTC, 매일 03:30 KST)에 Render의 `/api/cron-sync`를 호출한다. 공공데이터 조회는 Render 서버에서 실행하므로 GitHub Actions 실행 지역의 접속 제한 영향을 받지 않는다.
+- 32자 이상 임의의 `CRON_SYNC_TOKEN`을 Render Web Service 환경 변수와 GitHub Actions Secret에 같은 값으로 등록한다. GitHub에는 `WAVEPOINT_SYNC_URL=https://서비스주소/api/cron-sync`도 Secret으로 등록한다.
+- 배포 직후 GitHub Actions → `Daily official data sync` → Run workflow로 한 번 수동 실행하고, 로그의 JSON 결과에서 `errors: []`를 확인한다.
 - 500/503 오류, 동기화 실패, 스토리지 업로드 실패에 대한 알림을 배포 플랫폼 또는 모니터링 도구에서 설정한다.
 
 ## 현재 서버가 적용하는 기본 방어
