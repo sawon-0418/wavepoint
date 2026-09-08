@@ -1,0 +1,7 @@
+.env
+__pycache__/
+data/official_spots.json
+data/protected_areas.geojson
+data/protected_areas_last_response.xml
+data/reverse_geocode_cache.json
+wavepoint-checkpoint-*.tar.gz

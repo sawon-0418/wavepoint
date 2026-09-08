@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>물결포인트 | 낚시 포인트 공유</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="overrides.css?v=20260907-angler-profile" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#top"><span class="brand-mark">≋</span>물결포인트</a>
+      <nav aria-label="주요 메뉴">
+        <button class="active" type="button" data-tab="map-section">지도 탐색</button>
+        <button type="button" data-tab="guide">이용 안내</button>
+        <button id="admin-tab" type="button" data-tab="admin-section" hidden>운영자 채널</button>
+      </nav>
+      <button id="profile-button" class="profile" type="button" aria-label="로그인">로그인</button>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">대한민국 낚시꾼의 물길</p>
+          <h1>좋은 포인트는<br /><em>함께</em> 발견할수록 빛나요.</h1>
+          <p class="hero-copy">내가 아는 물가를 공유하고, 오늘의 조과로<br />전국의 낚시꾼들과 겨뤄보세요.</p>
+        </div>
+        <aside class="hero-ranking" aria-label="조과 랭킹"><div class="hero-ranking-head"><div><p>TOP CATCHES</p><h2>실시간 조과 랭킹</h2></div><button id="open-rank-catch-modal" type="button">조과 등록</button></div><div id="hero-ranking-list" class="hero-ranking-list"><p>랭킹을 불러오는 중…</p></div></aside>
+      </section>
+
+      <section id="map-section" class="map-section tab-panel">
+        <div class="section-heading"><div><p class="eyebrow">FIND A SPOT</p><h2>오늘, 어디로 갈까요?</h2></div></div>
+        <div class="map-shell">
+          <aside class="map-panel">
+            <label class="search"><span>⌕</span><input id="search-input" placeholder="지역 또는 포인트 검색" /></label>
+            <div class="filters" aria-label="포인트 필터"><button class="chip selected" data-filter="all">전체</button><button class="chip" data-filter="river">민물</button><button class="chip" data-filter="sea">바다</button><button class="chip" data-filter="community">사용자 공유</button></div>
+            <div id="spot-list" class="spot-list"></div>
+            <button id="open-spot-modal" class="primary-button add-spot" type="button"><span>＋</span> 포인트 공유하기</button>
+          </aside>
+          <div class="map-column">
+            <div class="map-navigation"><button id="map-back-button" class="text-button" type="button">← 뒤로 가기</button><button id="clear-region-filter" class="text-button" type="button">전국 보기</button><button id="locate-btn" type="button" hidden aria-hidden="true" tabindex="-1">내 위치로 이동</button></div>
+            <div id="map" aria-label="낚시 포인트 지도"></div>
+          </div>
+          <div class="map-hint">마커를 누르면 해당 포인트의 상세 정보를 볼 수 있어요</div>
+        </div>
+      </section>
+
+      <section id="guide" class="guide tab-panel" hidden><div><p class="eyebrow">HOW IT WORKS</p><h2>물결포인트를 즐기는 법</h2></div><ol><li><b>01</b><span>알고 있는 포인트를<br />지도에 남겨요.</span></li><li><b>02</b><span>오늘의 조과를 사진과<br />함께 기록해요.</span></li><li><b>03</b><span>실력으로 랭킹에<br />도전해요.</span></li></ol></section>
+      <section id="admin-section" class="admin-section tab-panel" hidden><div class="section-heading"><div><p class="eyebrow">ADMIN CHANNEL</p><h2>운영자 관리</h2></div><button id="admin-refresh" class="outline-button" type="button">새로고침</button></div><div class="admin-summary"><div><b id="admin-report-count">0</b><span>미처리 신고</span></div><div><b id="admin-inquiry-count">0</b><span>미처리 문의</span></div><div><b id="admin-spot-count">0</b><span>사용자 포인트</span></div></div><div class="admin-grid"><section><h3>신고 관리</h3><div id="admin-reports" class="admin-list"></div></section><section><h3>문의 · 정보 제보</h3><div id="admin-inquiries" class="admin-list"></div></section><section><h3>사용자 공유 포인트</h3><div id="admin-spots" class="admin-list"></div></section><section class="admin-audit-card"><h3>최근 운영 기록</h3><div id="admin-audits" class="admin-list"></div></section></div></section>
+    </main>
+
+    <dialog id="spot-modal" class="modal spot-modal-wide"><form id="spot-form"><div class="modal-header"><div><p class="eyebrow">NEW SPOT</p><h2>포인트 공유하기</h2></div><button class="close" type="button" data-close-modal="spot-modal" aria-label="닫기">×</button></div><div class="spot-location-search"><label>주소·낚시터·지역 검색<input id="spot-location-query" type="search" autocomplete="off" placeholder="예: 강화도, 청평호, 인천 중구" /></label><button id="spot-location-search-button" class="outline-button" type="button">검색</button></div><div id="spot-location-results" class="spot-location-results" hidden></div><p class="map-picker-guide">아래 지도를 클릭해 정확한 포인트 위치를 선택하세요.</p><div id="spot-picker-map" class="spot-picker-map" aria-label="포인트 위치 선택 지도"></div><p id="selected-location" class="location-note">현재 지도 중심 위치에 포인트가 등록됩니다.</p><p id="selected-address" class="location-note selected-address">주소를 확인하고 있어요…</p><input id="spot-address" name="address" type="hidden" /><label>포인트 이름<input required name="title" maxlength="32" placeholder="예: 해질녘 배스 포인트" /></label><label>구분<select name="kind"><option value="river">민물</option><option value="sea">바다</option></select></label><label>소개<textarea required name="description" maxlength="160" placeholder="수심, 잘 잡히는 시간대, 주의할 점을 알려주세요."></textarea></label><button class="primary-button" type="submit">공유하기</button></form></dialog>
+
+    <button id="open-catch-modal" type="button" hidden aria-hidden="true"></button><dialog id="catch-modal" class="modal"><form id="catch-form" method="dialog"><div class="modal-header"><div><p class="eyebrow">CATCH LOG</p><h2>조과 등록</h2></div><button class="close" type="button" data-close-modal="catch-modal" aria-label="닫기">×</button></div><label>어종<input required name="species" maxlength="20" placeholder="예: 배스" /></label><label>물고기 사진<input id="catch-image" required name="image" type="file" accept="image/*" /><span class="field-hint">길이를 모르면 AI 추정을 위해 사진이 필요해요.</span></label><img id="catch-preview" class="image-preview" alt="선택한 조과 사진 미리보기" hidden /><label>길이 (cm) <span class="optional">선택</span><input name="length" type="number" min="1" max="300" step="0.1" placeholder="모르면 비워두세요" /></label><p class="ai-notice">✦ 길이를 비우면 사진을 분석해 <b>AI 추정</b> 길이로 기록됩니다.</p><button class="primary-button" value="submit">랭킹에 등록</button></form></dialog>
+
+    <dialog id="spot-detail-modal" class="modal detail-modal">
+      <div class="detail-inner">
+        <div class="modal-header"><div><p class="eyebrow">SPOT GUIDE</p><h2 id="detail-title">포인트 상세</h2></div><button class="close" type="button" data-close-modal="spot-detail-modal" aria-label="닫기">×</button></div>
+        <p id="detail-description" class="detail-description"></p>
+        <section id="detail-owner-card" class="spot-owner-card" hidden><div><small>사용자 공유 포인트</small><b id="detail-owner-name">공유자</b></div><button id="detail-owner-profile" class="outline-button" type="button">공유자 조과 보기</button></section>
+        <button id="detail-address" class="address-button" type="button"></button>
+        <section class="regulation-card"><div class="regulation-heading"><span>◉</span><div><b>현재 낚시 규정</b><small id="detail-region"></small></div></div><div id="detail-regulations" class="regulation-list"></div></section>
+        <section class="community-card"><div class="community-heading"><div><b>게시글 · 조과</b><small>인기순 · 길이 경쟁</small></div><button id="new-post-button" class="primary-button" type="button">글 작성</button></div><div id="spot-posts" class="spot-posts"></div></section>
+        <div class="detail-actions"><button id="report-spot-button" class="text-button" type="button">낚시터 정보 신고</button></div>
+        <p class="legal-note">규정은 어종·해역·지자체 고시에 따라 달라질 수 있습니다. 출조 전 해양수산부 및 현장 안내판의 최신 기준을 확인하세요.</p>
+      </div>
+    </dialog>
+    <dialog id="post-modal" class="modal"><form id="post-form"><div class="modal-header"><div><p class="eyebrow">CATCH POST</p><h2>게시글 · 조과 등록</h2></div><button class="close" type="button" data-close-modal="post-modal">×</button></div><label>작성자 <span class="optional">로그인 닉네임</span><input name="author" maxlength="24" readonly /></label><label>내용<textarea required name="content" maxlength="800" placeholder="조황, 팁, 주의사항을 남겨주세요."></textarea></label><label>사진 <span class="optional">선택 · JPG/PNG/WEBP, 5MB 이하</span><input name="image" type="file" accept="image/jpeg,image/png,image/webp" /></label><label>어종 <input name="species" maxlength="30" placeholder="예: 우럭" /></label><label>길이(cm) <span class="optional">선택</span><input name="length" type="number" min="1" max="300" step="0.1" placeholder="사진 AI 추정은 추후 연동" /></label><button class="primary-button" type="submit">게시하기</button></form></dialog>
+    <dialog id="rank-catch-modal" class="modal"><form id="rank-catch-form"><div class="modal-header"><div><p class="eyebrow">RANKING CATCH</p><h2>실시간 조과 등록</h2></div><button class="close" type="button" data-close-modal="rank-catch-modal">×</button></div><label>낚시 포인트<input id="rank-spot-picker" list="rank-spot-options" required autocomplete="off" placeholder="포인트명, 지역, 어종 검색 후 선택" /><datalist id="rank-spot-options"></datalist><input id="rank-spot-id" name="spotId" type="hidden" /></label><p id="rank-address-note" class="location-note">포인트명이나 지역을 검색한 뒤 목록에서 선택해 주세요.</p><p class="location-note rank-address-help">주소를 모르거나 목록에 포인트가 없나요? <button id="rank-open-spot" type="button">낚시 포인트를 등록</button>해 주세요.</p><label>작성자 <span class="optional">로그인 닉네임</span><input name="author" maxlength="24" readonly /></label><label>어종<input required name="species" maxlength="30" placeholder="예: 광어" /></label><label>길이(cm)<input required name="length" type="number" min="1" max="300" step="0.1" /></label><label>조과 설명 <span class="optional">선택</span><textarea name="content" maxlength="800" placeholder="잡은 시간, 채비 등을 남겨주세요."></textarea></label><label>사진 <span class="optional">JPG/PNG/WEBP, 5MB 이하</span><input name="image" type="file" accept="image/jpeg,image/png,image/webp" /></label><button class="primary-button" type="submit">랭킹 등록</button></form></dialog>
+    <dialog id="report-modal" class="modal"><form id="report-form"><div class="modal-header"><div><p class="eyebrow">REPORT</p><h2>신고하기</h2></div><button class="close" type="button" data-close-modal="report-modal">×</button></div><label>사유<select name="reason"><option>잘못된 위치·정보</option><option>부적절한 내용</option><option>폐업·이용 불가</option><option>기타</option></select></label><label>상세 내용<textarea required name="message" maxlength="1200"></textarea></label><button class="primary-button" type="submit">신고 접수</button></form></dialog>
+    <dialog id="inquiry-modal" class="modal"><form id="inquiry-form"><div class="modal-header"><div><p class="eyebrow">CONTACT</p><h2>문의 · 정보 제보</h2></div><button class="close" type="button" data-close-modal="inquiry-modal">×</button></div><label>유형<select name="kind"><option>새 낚시터 정보 제보</option><option>데이터 오류 신고</option><option>서비스 문제</option><option>기타 문의</option></select></label><label>연락처 <span class="optional">선택</span><input name="contact" maxlength="120" /></label><label>내용<textarea required name="message" maxlength="1200"></textarea></label><button class="primary-button" type="submit">보내기</button></form></dialog>
+    <dialog id="auth-modal" class="modal"><form id="signin-form"><div class="modal-header"><div><p class="eyebrow">MEMBER</p><h2>로그인</h2></div><button class="close" type="button" data-close-modal="auth-modal">×</button></div><label>이메일<input required name="email" type="email" autocomplete="email" /></label><label>비밀번호<input required name="password" type="password" minlength="8" autocomplete="current-password" /></label><button class="primary-button" type="submit">로그인</button><p class="auth-switch">처음이신가요? <button id="show-signup" type="button">회원가입</button></p></form></dialog>
+    <dialog id="signup-modal" class="modal"><form id="signup-form"><div class="modal-header"><div><p class="eyebrow">MEMBER</p><h2>회원가입</h2></div><button class="close" type="button" data-close-modal="signup-modal">×</button></div><label>이메일 <span id="signup-email-state" class="optional">인증 필요</span><span class="email-verify-row"><input id="signup-email" required name="email" type="email" autocomplete="email" placeholder="name@example.com" /><button id="start-email-verification" type="button">인증하기</button></span></label><div id="signup-details" hidden><label>닉네임<input required name="nickname" maxlength="24" autocomplete="nickname" /></label><label>비밀번호 <span class="optional">8자 이상</span><input required name="password" type="password" minlength="8" autocomplete="new-password" /></label><button class="primary-button" type="submit">회원가입</button></div><p class="auth-switch">이미 계정이 있나요? <button id="show-signin" type="button">로그인</button></p></form><section id="email-confirmation-panel" class="email-confirmation" hidden><div class="modal-header"><div><p class="eyebrow">VERIFY EMAIL</p><h2>이메일 인증</h2></div><button class="close" type="button" data-close-modal="signup-modal">×</button></div><p><strong id="confirmation-email"></strong>으로 인증 메일을 보냈습니다. 메일에 적힌 인증번호를 입력해 주세요.</p><label>인증번호<input id="signup-email-token" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="메일의 인증번호 입력" /></label><button id="verify-signup-email" class="primary-button" type="button">인증 확인</button><button id="resend-confirmation" class="outline-button email-resend" type="button">인증 메일 다시 보내기</button><p class="auth-switch"><button id="confirmation-to-signin" type="button">로그인으로 돌아가기</button></p></section></dialog>
+    <dialog id="profile-modal" class="modal"><section class="profile-menu"><div class="modal-header"><div><p class="eyebrow">MY ACCOUNT</p><h2>내 프로필</h2></div><button class="close" type="button" data-close-modal="profile-modal" aria-label="닫기">×</button></div><p id="profile-email" class="profile-email"></p><p id="profile-role" class="profile-role"></p><button id="profile-catches" class="outline-button" type="button">내 조과 보기</button><button id="profile-logout" class="outline-button" type="button">로그아웃</button></section></dialog>
+    <dialog id="angler-profile-modal" class="modal"><section class="angler-profile"><div class="modal-header"><div><p class="eyebrow">ANGLER PROFILE</p><h2 id="angler-profile-name">낚시꾼 프로필</h2></div><button class="close" type="button" data-close-modal="angler-profile-modal" aria-label="닫기">×</button></div><p id="angler-catch-total" class="angler-catch-total"></p><h3>가장 긴 조과 TOP 5</h3><div id="angler-top-catches" class="angler-top-catches"></div></section></dialog>
+    <dialog id="privacy-modal" class="modal policy-modal"><div class="detail-inner"><div class="modal-header"><div><p class="eyebrow">PRIVACY</p><h2>개인정보처리방침</h2></div><button class="close" type="button" data-close-modal="privacy-modal">×</button></div><p>물결포인트는 회원 식별을 위해 이메일, 닉네임을 처리하며, 문의 시 사용자가 직접 입력한 연락처를 처리할 수 있습니다. 게시글·사진·신고·문의 정보는 서비스 운영, 분쟁 대응 및 법령상 의무 이행을 위해 보관합니다.</p><p>회원 정보와 운영 데이터는 Supabase에 보관하며, 서비스 제공에 필요한 외부 지도·공공데이터 서비스 외에는 판매하거나 제공하지 않습니다. 열람·정정·삭제 요청은 문의 기능으로 접수할 수 있습니다.</p></div></dialog>
+    <dialog id="terms-modal" class="modal policy-modal"><div class="detail-inner"><div class="modal-header"><div><p class="eyebrow">TERMS</p><h2>이용약관</h2></div><button class="close" type="button" data-close-modal="terms-modal">×</button></div><p>이용자는 정확한 정보를 등록하고 타인의 개인정보·저작권·명예를 침해하는 콘텐츠를 게시해서는 안 됩니다. 낚시 관련 법령, 금지구역, 안전수칙은 이용자가 출조 전 직접 최신 기준을 확인해야 합니다.</p><p>운영자는 허위 위치, 불법 조업 조장, 욕설·혐오, 광고·도배, 타인 권리 침해 콘텐츠를 숨김 또는 삭제할 수 있으며 반복 위반 계정의 이용을 제한할 수 있습니다.</p></div></dialog>
+    <dialog id="location-modal" class="modal policy-modal"><div class="detail-inner"><div class="modal-header"><div><p class="eyebrow">LOCATION</p><h2>위치정보 안내</h2></div><button class="close" type="button" data-close-modal="location-modal">×</button></div><p>현재 물결포인트는 기기의 GPS 등 개인 위치정보를 직접 수집하지 않습니다. 사용자가 주소·지역을 검색하거나 지도에서 직접 지정한 위치만 포인트 등록과 지도 표시를 위해 처리합니다.</p><p>향후 현재 위치 기능을 제공할 경우, 별도 동의와 관련 법령 검토를 거쳐 안내 및 약관을 갱신합니다.</p></div></dialog>
+    <dialog id="region-detail-modal" class="modal detail-modal">
+      <div class="detail-inner region-detail-inner">
+        <div class="modal-header"><div><p class="eyebrow">REGION SPOTS</p><h2 id="region-detail-title">지역 낚시터</h2></div><button class="close" type="button" data-close-modal="region-detail-modal" aria-label="닫기">×</button></div>
+        <button id="region-focus" class="primary-button region-focus" type="button">이 지역 자세히 보기</button>
+        <p id="region-detail-count" class="region-count"></p>
+        <div id="region-spot-list" class="region-spot-list"></div>
+      </div>
+    </dialog>
+            <div class="restricted-legend" id="protected-legend"><span></span> 포획·출입 제한 구역</div>
+    <footer class="legal-footer"><button data-open-policy="privacy-modal" type="button">개인정보처리방침</button><button data-open-policy="terms-modal" type="button">이용약관</button><button data-open-policy="location-modal" type="button">위치정보 안내</button><span>신고된 게시글·사진은 검토 후 숨김 또는 삭제될 수 있습니다.</span></footer>
+    <button id="open-inquiry-modal" class="inquiry-fab" type="button">문의 · 정보 제보</button><div id="toast" class="toast" role="status"></div>
+    <script src="app.js?v=20260908-search-list-only" ></script>
+  </body>
+</html>
