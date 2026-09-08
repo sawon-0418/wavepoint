@@ -175,7 +175,35 @@ $('#open-inquiry-modal').addEventListener('click', () => $('#inquiry-modal').sho
 async function apiError(response, fallback) { try { const result = await response.json(); return result.error || fallback; } catch { return fallback; } }
 async function uploadPostImage(file) { if(!file || !file.size) return ''; if(file.size > 5 * 1024 * 1024) throw new Error('사진은 5MB 이하만 업로드할 수 있습니다.'); const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}); const response=await fetch('/api/community/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl})}); if(!response.ok) throw new Error(await apiError(response,'사진 업로드에 실패했습니다.')); return (await response.json()).imageUrl; }
 async function submitOnce(form, dialog, request, successMessage, fallback) { if(form.dataset.submitting === 'true') return false; form.dataset.submitting='true'; const button=form.querySelector('button[type="submit"]'), originalLabel=button?.textContent; if(button){button.disabled=true;button.textContent='처리 중…';} try { const response=await request(); if(!response.ok){toast(await apiError(response, fallback));return false;} form.reset(); if(dialog.open) dialog.close(); toast(successMessage); return true; } catch (error) { toast(error.message || fallback); return false; } finally { form.dataset.submitting='false'; if(button){button.disabled=false;button.textContent=originalLabel;} } }
-$('#post-form').addEventListener('submit', event => { event.preventDefault(); if(!currentSpot)return; const form=event.currentTarget,data=new FormData(form),length=data.get('length'); submitOnce(form,$('#post-modal'),async()=>{const imageUrl=await uploadPostImage(data.get('image'));return fetch('/api/community/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({spotId:currentSpot.id,author:data.get('author')||'익명 낚시꾼',content:data.get('content'),imageUrl,species:data.get('species'),length:length?Number(length):null,lengthIsAi:false})});},'게시글과 조과가 등록되었습니다.','게시글 저장에 실패했습니다.'); loadSpotPosts(currentSpot.id); });
+function addFormValidationFeedback(form) {
+  // 브라우저 기본 검증만으로는 모바일에서 제출이 막힌 이유가 잘 보이지 않을 수 있다.
+  form.addEventListener('invalid', event => {
+    if (form.dataset.validationNotified === 'true') return;
+    form.dataset.validationNotified = 'true';
+    setTimeout(() => { delete form.dataset.validationNotified; }, 0);
+    const field = event.target;
+    const label = field.closest('label')?.childNodes?.[0]?.textContent?.trim() || '필수 항목';
+    toast(`${label}을(를) 확인해 주세요.`);
+  }, true);
+}
+
+addFormValidationFeedback($('#post-form'));
+addFormValidationFeedback($('#rank-catch-form'));
+
+$('#post-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!signedInUser) { showAuth(); return toast('로그인 후 게시글을 등록할 수 있습니다.'); }
+  if (!currentSpot) return toast('낚시터를 다시 선택한 뒤 게시글을 등록해 주세요.');
+  const form = event.currentTarget, data = new FormData(form), length = data.get('length');
+  const saved = await submitOnce(form, $('#post-modal'), async () => {
+    const imageUrl = await uploadPostImage(data.get('image'));
+    return fetch('/api/community/post', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({spotId:currentSpot.id, author:data.get('author') || '익명 낚시꾼', content:data.get('content'), imageUrl, species:data.get('species'), length:length ? Number(length) : null, lengthIsAi:false})
+    });
+  }, '게시글과 조과가 등록되었습니다.', '게시글 저장에 실패했습니다.');
+  if (saved) loadSpotPosts(currentSpot.id);
+});
 $('#report-form').addEventListener('submit', event => { event.preventDefault(); const form=event.currentTarget,data=new FormData(form); submitOnce(form,$('#report-modal'),()=>fetch('/api/community/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...reportTarget,reason:data.get('reason'),message:data.get('message')})}),'신고가 접수되었습니다.','신고 접수에 실패했습니다.'); });
 $('#inquiry-form').addEventListener('submit', event => { event.preventDefault(); const form=event.currentTarget,data=new FormData(form); submitOnce(form,$('#inquiry-modal'),()=>fetch('/api/community/inquiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:data.get('kind'),contact:data.get('contact'),message:data.get('message')})}),'문의가 접수되었습니다.','문의 전송에 실패했습니다.'); });
 $('#clear-region-filter').addEventListener('click', () => { mapRegionFilter=null; renderSpots(); setMapView(37.47,127.0,8); toast('전국 낚시터를 표시합니다.'); });
@@ -282,7 +310,12 @@ function renderRankSpotOptions() {
 }
 function updateRankSpotAddress() {
   const picker = $('#rank-spot-picker');
-  const spot = spots.find(item => rankSpotLabel(item) === picker.value);
+  const query = picker.value.trim();
+  // 목록을 고르면 전체 라벨을 쓰지만, 사용자가 포인트명만 입력한 경우도 인식한다.
+  // 동명 포인트는 전체 라벨을 선택해야 주소까지 정확히 구분된다.
+  const sameTitle = spots.filter(item => item.title === query);
+  const spot = spots.find(item => rankSpotLabel(item) === query)
+    || (sameTitle.length === 1 ? sameTitle[0] : null);
   const note = $('#rank-address-note');
   $('#rank-spot-id').value = spot ? spot.id : '';
   if (!spot) {
@@ -313,6 +346,7 @@ $('#rank-open-spot').addEventListener('click', () => {
 });
 $('#rank-catch-form').addEventListener('submit', event => {
   event.preventDefault();
+  if (!signedInUser) { showAuth(); return toast('로그인 후 조과를 등록할 수 있습니다.'); }
   const form = event.currentTarget;
   updateRankSpotAddress();
   if (!$('#rank-spot-id').value) return toast('목록에서 낚시 포인트를 선택해 주세요.');

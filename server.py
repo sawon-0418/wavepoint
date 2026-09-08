@@ -690,7 +690,8 @@ class Handler(SimpleHTTPRequestHandler):
                     email, token = str(payload.get("email", "")).strip(), str(payload.get("token", "")).strip()
                     if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email) or not token:
                         return self.send_json({"error": "이메일과 인증번호를 입력해 주세요."}, 400)
-                    result = supabase_auth("verify", "POST", {"email": email, "token": token, "type": "email"})
+                    # 회원가입 확인 메일에서 발급된 OTP는 Supabase의 signup 유형으로 검증한다.
+                    result = supabase_auth("verify", "POST", {"email": email, "token": token, "type": "signup"})
                     access_token = (result or {}).get("access_token", "")
                     if not access_token: return self.send_json({"error": "이메일 인증을 확인하지 못했습니다."}, 400)
                     return self.send_json({"emailVerified": True, "email": email}, 200, {"Set-Cookie": f"wave_signup_verification={access_token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=900"})
