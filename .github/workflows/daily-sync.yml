@@ -1,0 +1,39 @@
+name: Daily official data sync
+
+on:
+  # GitHub Actions의 cron은 UTC 기준이다: 매일 03:30 KST.
+  schedule:
+    - cron: "30 18 * * *"
+  # 배포 직후 또는 장애 복구 시 Actions 화면에서 수동 실행할 수 있다.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync fishing spots and protected areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      FISHING_SPOTS_API_KEY: ${{ secrets.FISHING_SPOTS_API_KEY }}
+      FISHING_SPOTS_API_URL: ${{ secrets.FISHING_SPOTS_API_URL }}
+      PROTECTED_AREAS_API_KEY: ${{ secrets.PROTECTED_AREAS_API_KEY }}
+      PROTECTED_AREAS_WFS_URL: ${{ secrets.PROTECTED_AREAS_WFS_URL }}
+      PROTECTED_AREAS_WMS_URL: ${{ secrets.PROTECTED_AREAS_WMS_URL }}
+      PROTECTED_AREAS_BBOX: ${{ secrets.PROTECTED_AREAS_BBOX }}
+      NAVER_MAPS_NCP_KEY_ID: ${{ secrets.NAVER_MAPS_NCP_KEY_ID }}
+      NAVER_MAPS_CLIENT_SECRET: ${{ secrets.NAVER_MAPS_CLIENT_SECRET }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Run official data sync
+        run: python sync_job.py
