@@ -155,7 +155,8 @@ async function loadSpotPosts(spotId) {
     const result = await fetch(`/api/community?spotId=${encodeURIComponent(spotId)}`).then(response => response.json());
     if (result.error) throw new Error(result.error);
     const posts = result.posts || [];
-    container.innerHTML = posts.length ? posts.map(post => { const imageUrl=safeImageUrl(post.image_url); return `<article class="post-card${imageUrl?' has-image':''}"><div class="post-copy"><header><b>${escapeHTML(post.author || '익명 낚시꾼')}</b><span>${post.length ? `${Number(post.length).toFixed(1)}cm${post.length_is_ai ? ' · AI 추정' : ''}` : '일반 후기'}</span></header><p>${escapeHTML(post.content)}</p><footer><span>${post.species ? escapeHTML(post.species) : '조황 정보'} · 추천 ${post.likes || 0}</span><span><button data-like="${post.id}">추천</button> <button class="report-post" data-report-post="${post.id}">신고</button></span></footer></div>${imageUrl?`<a class="post-thumbnail" href="${escapeHTML(imageUrl)}" target="_blank" rel="noopener"><img src="${escapeHTML(imageUrl)}" alt="게시글 사진" /></a>`:''}</article>`; }).join('') : '<p class="empty-post">아직 게시글이 없습니다. 첫 조황을 남겨보세요.</p>';
+    const viewerId = result.viewerId || '';
+    container.innerHTML = posts.length ? posts.map(post => { const imageUrl=safeImageUrl(post.image_url); const ownPost=viewerId && post.author_id === viewerId; return `<article class="post-card${imageUrl?' has-image':''}"><div class="post-copy"><header><b>${escapeHTML(post.author || '익명 낚시꾼')}</b><span>${post.length ? `${Number(post.length).toFixed(1)}cm${post.length_is_ai ? ' · AI 추정' : ''}` : '일반 후기'}</span></header><p>${escapeHTML(post.content)}</p><footer><span>${post.species ? escapeHTML(post.species) : '조황 정보'} · 추천 ${post.likes || 0}</span><span><button data-like="${post.id}">추천</button> <button class="report-post" data-report-post="${post.id}">신고</button>${ownPost ? ` <button class="delete-post" data-delete-post="${post.id}">삭제</button>` : ''}</span></footer></div>${imageUrl?`<a class="post-thumbnail" href="${escapeHTML(imageUrl)}" target="_blank" rel="noopener"><img src="${escapeHTML(imageUrl)}" alt="게시글 사진" /></a>`:''}</article>`; }).join('') : '<p class="empty-post">아직 게시글이 없습니다. 첫 조황을 남겨보세요.</p>';
     container.querySelectorAll('.post-card header b').forEach((author, index) => {
       const authorId = posts[index]?.author_id;
       if (!authorId) return;
@@ -166,6 +167,12 @@ async function loadSpotPosts(spotId) {
     });
     container.querySelectorAll('[data-like]').forEach(button => button.addEventListener('click', async () => { await fetch('/api/community/like', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:button.dataset.like})}); loadSpotPosts(spotId); }));
     container.querySelectorAll('[data-report-post]').forEach(button => button.addEventListener('click', () => openReport('post', button.dataset.reportPost)));
+    container.querySelectorAll('[data-delete-post]').forEach(button => button.addEventListener('click', async () => {
+      if (!window.confirm('내 게시글을 삭제할까요? 삭제한 게시글은 복구할 수 없습니다.')) return;
+      const response = await fetch('/api/community/delete-post', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:button.dataset.deletePost})});
+      if (!response.ok) return toast(await apiError(response, '게시글을 삭제하지 못했습니다.'));
+      toast('게시글을 삭제했습니다.'); loadSpotPosts(spotId); loadHeroRanking();
+    }));
   } catch { container.innerHTML = '<p class="empty-post">게시글 서비스를 준비 중입니다. Supabase 테이블 설정을 확인해주세요.</p>'; }
 }
 function openReport(kind, targetId) { if (!signedInUser) { showAuth(); toast('로그인 후 신고할 수 있습니다.'); return; } reportTarget={kind,targetId}; $('#report-modal').showModal(); }
@@ -563,7 +570,8 @@ function adminReportItem(item) {
   const targetAction = targetType ? `${item.target_hidden ? 'restore' : 'hide'}-${targetType}` : '';
   const targetLabel = item.target_hidden ? '숨김 해제' : '대상 숨김';
   const status = item.status === 'resolved' ? '처리 완료' : '미처리';
-  return `<article class="admin-item"><b>${escapeHTML(item.kind || '신고')} · ${escapeHTML(item.reason || '사유 없음')} · ${status}</b><small>${escapeHTML(memberLabel(item, '신고자'))} · ${escapeHTML(item.message || '')}${item.admin_note ? ` · 메모: ${escapeHTML(item.admin_note)}` : ''}</small>${targetAction && item.target_id ? `<button type="button" data-admin-action="${targetAction}" data-admin-id="${escapeHTML(item.target_id)}">${targetLabel}</button>` : ''}${item.status !== 'resolved' ? `<button type="button" data-admin-action="resolve-report" data-admin-id="${escapeHTML(item.id)}">처리 완료</button>` : ''}</article>`;
+  const deleteButton = item.kind === 'post' && item.target_hidden ? `<button type="button" class="admin-delete-button" data-admin-action="delete-post" data-admin-id="${escapeHTML(item.target_id)}">영구 삭제</button>` : '';
+  return `<article class="admin-item"><b>${escapeHTML(item.kind || '신고')} · ${escapeHTML(item.reason || '사유 없음')} · ${status}</b><small>${escapeHTML(memberLabel(item, '신고자'))} · ${escapeHTML(item.message || '')}${item.admin_note ? ` · 메모: ${escapeHTML(item.admin_note)}` : ''}</small>${targetAction && item.target_id ? `<button type="button" data-admin-action="${targetAction}" data-admin-id="${escapeHTML(item.target_id)}">${targetLabel}</button>` : ''}${deleteButton}${item.status !== 'resolved' ? `<button type="button" data-admin-action="resolve-report" data-admin-id="${escapeHTML(item.id)}">처리 완료</button>` : ''}</article>`;
 }
 async function loadAdminOverview() {
   if (signedInUser?.role !== 'admin') return;
@@ -584,12 +592,13 @@ async function loadAdminOverview() {
   document.querySelectorAll('[data-admin-action]').forEach(button => button.addEventListener('click', async () => {
     const action = button.dataset.adminAction;
     if (action === 'delete-spot' && !window.confirm('숨김 처리된 포인트와 연결된 게시글을 영구 삭제합니다. 계속할까요?')) return;
+    if (action === 'delete-post' && !window.confirm('숨김 처리된 게시글을 영구 삭제합니다. 계속할까요?')) return;
     const note = action === 'resolve-report' || action === 'resolve-inquiry' ? window.prompt('처리 메모를 입력하세요. (선택)', '') : '';
     if (note === null) return;
     const response = await fetch(`/api/admin/${action}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:button.dataset.adminId, note})});
     if (!response.ok) return toast(await apiError(response, '처리를 완료하지 못했습니다.'));
     toast(action === 'delete-spot' ? '포인트를 영구 삭제했습니다.' : '운영자 처리가 완료되었습니다.');
-    if (['hide-post','hide-spot','restore-post','restore-spot','delete-spot'].includes(action)) loadHeroRanking();
+    if (['hide-post','hide-spot','restore-post','restore-spot','delete-post','delete-spot'].includes(action)) loadHeroRanking();
     if (['hide-spot','restore-spot','delete-spot'].includes(action)) loadCommunitySpots();
     loadAdminOverview();
   }));

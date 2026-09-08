@@ -133,6 +133,49 @@ def attach_member_labels(*collections):
         item["reporter_key"] = user_id[:8] if user_id else ""
     return rows
 
+def storage_request(url, key, name, binary, mime_type):
+    request = urllib.request.Request(
+        f"{url}/storage/v1/object/post-images/{name}", data=binary, method="POST",
+        headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": mime_type, "x-upsert": "false"},
+    )
+    with urllib.request.urlopen(request, timeout=25):
+        pass
+
+def ensure_post_image_bucket(url, key):
+    """초기 SQL이 아직 적용되지 않은 배포에서도 사진 버킷을 한 번 자동 준비한다."""
+    payload = json.dumps({"id": "post-images", "name": "post-images", "public": True, "file_size_limit": 5 * 1024 * 1024, "allowed_mime_types": ["image/jpeg", "image/png", "image/webp"]}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{url}/storage/v1/bucket", data=payload, method="POST",
+        headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15):
+            pass
+    except urllib.error.HTTPError as error:
+        # 이미 존재하는 버킷은 그대로 사용한다. 다른 오류는 원인을 사용자에게 전달한다.
+        if error.code not in (400, 409):
+            detail = error.read().decode("utf-8", "replace")[:300]
+            raise RuntimeError(f"사진 저장소를 준비하지 못했습니다. (HTTP {error.code}: {detail})") from error
+
+def delete_post_image(image_url):
+    if not image_url: return
+    marker = "/storage/v1/object/public/post-images/"
+    if marker not in image_url: return
+    name = image_url.split(marker, 1)[1]
+    if not name or "/" not in name: return
+    url = supabase_base_url()
+    key = supabase_value("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERV_ROLE_KEY")
+    request = urllib.request.Request(
+        f"{url}/storage/v1/object/post-images/{urllib.parse.quote(name, safe='/')}", method="DELETE",
+        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15):
+            pass
+    except urllib.error.HTTPError as error:
+        if error.code != 404:
+            raise RuntimeError(f"게시글 사진을 삭제하지 못했습니다. (HTTP {error.code})") from error
+
 def upload_post_image(data_url):
     match = re.match(r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$", data_url or "")
     if not match: raise RuntimeError("JPG, PNG, WEBP 이미지만 업로드할 수 있습니다.")
@@ -142,11 +185,19 @@ def upload_post_image(data_url):
     key = supabase_value("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERV_ROLE_KEY")
     suffix = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[match.group(1)]
     name = f"posts/{uuid.uuid4()}.{suffix}"
-    request = urllib.request.Request(f"{url}/storage/v1/object/post-images/{name}", data=binary, method="POST", headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": match.group(1), "x-upsert": "false"})
     try:
-        with urllib.request.urlopen(request, timeout=25): pass
+        storage_request(url, key, name, binary, match.group(1))
     except urllib.error.HTTPError as error:
-        raise RuntimeError(f"사진 업로드 실패 (HTTP {error.code})") from error
+        detail = error.read().decode("utf-8", "replace")[:300]
+        missing_bucket = error.code == 404 or "bucket" in detail.lower() and "not found" in detail.lower()
+        if not missing_bucket:
+            raise RuntimeError(f"사진 업로드에 실패했습니다. (HTTP {error.code}: {detail})") from error
+        ensure_post_image_bucket(url, key)
+        try:
+            storage_request(url, key, name, binary, match.group(1))
+        except urllib.error.HTTPError as retry_error:
+            detail = retry_error.read().decode("utf-8", "replace")[:300]
+            raise RuntimeError(f"사진 업로드에 실패했습니다. (HTTP {retry_error.code}: {detail})") from retry_error
     return f"{url}/storage/v1/object/public/post-images/{name}"
 
 def read_json(name, fallback):
@@ -746,6 +797,18 @@ class Handler(SimpleHTTPRequestHandler):
                 elif action == "restore-post":
                     supabase_request(f"posts?id=eq.{urllib.parse.quote(target_id, safe='')}", "PATCH", {"is_hidden": False, "hidden_at": None, "hidden_by": None})
                     target_type = "post"
+                elif action == "delete-post":
+                    post_rows = supabase_request(f"posts?id=eq.{urllib.parse.quote(target_id, safe='')}&select=id,is_hidden,image_url") or []
+                    if not post_rows: return self.send_json({"error": "삭제할 게시글을 찾지 못했습니다."}, 404)
+                    if not post_rows[0].get("is_hidden"):
+                        return self.send_json({"error": "게시글을 먼저 숨김 처리한 뒤에만 삭제할 수 있습니다."}, 400)
+                    delete_post_image(post_rows[0].get("image_url"))
+                    supabase_request(f"posts?id=eq.{urllib.parse.quote(target_id, safe='')}", "DELETE", None, "return=minimal")
+                    pending_reports = supabase_request(f"reports?target_id=eq.{urllib.parse.quote(target_id, safe='')}&kind=eq.post&status=eq.pending&select=id") or []
+                    if pending_reports:
+                        supabase_request(f"reports?target_id=eq.{urllib.parse.quote(target_id, safe='')}&kind=eq.post&status=eq.pending", "PATCH", {"status": "resolved", "reviewed_at": now, "reviewed_by": user["id"], "admin_note": "대상 게시글 영구 삭제로 자동 처리 완료"})
+                    resolved_reports = len(pending_reports)
+                    target_type = "post"
                 elif action == "hide-spot":
                     supabase_request(f"community_spots?id=eq.{urllib.parse.quote(target_id, safe='')}", "PATCH", {"is_hidden": True, "hidden_at": now, "hidden_by": user["id"]})
                     target_type = "spot"
@@ -757,8 +820,9 @@ class Handler(SimpleHTTPRequestHandler):
                     if not spot_rows: return self.send_json({"error": "삭제할 사용자 포인트를 찾지 못했습니다."}, 404)
                     if not spot_rows[0].get("is_hidden"):
                         return self.send_json({"error": "포인트를 먼저 숨김 처리한 뒤에만 삭제할 수 있습니다."}, 400)
-                    linked_posts = supabase_request(f"posts?spot_id=eq.{urllib.parse.quote(target_id, safe='')}&select=id") or []
+                    linked_posts = supabase_request(f"posts?spot_id=eq.{urllib.parse.quote(target_id, safe='')}&select=id,image_url") or []
                     for post in linked_posts:
+                        delete_post_image(post.get("image_url"))
                         supabase_request(f"posts?id=eq.{urllib.parse.quote(str(post['id']), safe='')}", "DELETE", None, "return=minimal")
                     deleted_posts = len(linked_posts)
                     supabase_request(f"community_spots?id=eq.{urllib.parse.quote(target_id, safe='')}", "DELETE", None, "return=minimal")
@@ -793,6 +857,18 @@ class Handler(SimpleHTTPRequestHandler):
                     item = {"id": str(uuid.uuid4()), "spot_id": str(payload.get("spotId", "")), "author": user["displayName"], "author_id": user["id"], "content": str(payload.get("content", ""))[:800], "species": str(payload.get("species", ""))[:30], "length": payload.get("length"), "length_is_ai": bool(payload.get("lengthIsAi")), "image_url": str(payload.get("imageUrl", ""))[:1000] or None}
                     if not item["spot_id"] or not item["content"]: return self.send_json({"error": "낚시터와 글 내용은 필수입니다."}, 400)
                     return self.send_json({"post": supabase_request("posts", "POST", item)[0]}, 201)
+                if action == "delete-post":
+                    post_id = str(payload.get("postId", ""))
+                    post_rows = supabase_request(f"posts?id=eq.{urllib.parse.quote(post_id, safe='')}&select=id,author_id,image_url") or []
+                    if not post_rows: return self.send_json({"error": "삭제할 게시글을 찾지 못했습니다."}, 404)
+                    if str(post_rows[0].get("author_id") or "") != user["id"]:
+                        return self.send_json({"error": "본인이 작성한 게시글만 삭제할 수 있습니다."}, 403)
+                    delete_post_image(post_rows[0].get("image_url"))
+                    supabase_request(f"posts?id=eq.{urllib.parse.quote(post_id, safe='')}", "DELETE", None, "return=minimal")
+                    pending_reports = supabase_request(f"reports?target_id=eq.{urllib.parse.quote(post_id, safe='')}&kind=eq.post&status=eq.pending&select=id") or []
+                    if pending_reports:
+                        supabase_request(f"reports?target_id=eq.{urllib.parse.quote(post_id, safe='')}&kind=eq.post&status=eq.pending", "PATCH", {"status": "resolved", "reviewed_at": datetime.now(timezone.utc).isoformat(), "reviewed_by": user["id"], "admin_note": "작성자 삭제로 자동 처리 완료"})
+                    return self.send_json({"ok": True}, 200)
                 if action == "spot":
                     if not self.require_rate_limit(user, "spot", 5, 86400): return
                     item = {"id": str(uuid.uuid4()), "user_id": user["id"], "title": str(payload.get("title", ""))[:32], "kind": str(payload.get("kind", "river")), "description": str(payload.get("description", ""))[:160], "address": str(payload.get("address", ""))[:240] or None, "species": "새 포인트", "lat": float(payload.get("lat")), "lng": float(payload.get("lng"))}
