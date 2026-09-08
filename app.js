@@ -181,7 +181,25 @@ $('#report-spot-button').addEventListener('click', () => { if(currentSpot) openR
 $('#open-inquiry-modal').addEventListener('click', () => $('#inquiry-modal').showModal());
 async function apiError(response, fallback) { try { const result = await response.json(); return result.error || fallback; } catch { return fallback; } }
 async function uploadPostImage(file) { if(!file || !file.size) return ''; if(file.size > 5 * 1024 * 1024) throw new Error('사진은 5MB 이하만 업로드할 수 있습니다.'); const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}); const response=await fetch('/api/community/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl})}); if(!response.ok) throw new Error(await apiError(response,'사진 업로드에 실패했습니다.')); return (await response.json()).imageUrl; }
-async function submitOnce(form, dialog, request, successMessage, fallback) { if(form.dataset.submitting === 'true') return false; form.dataset.submitting='true'; const button=form.querySelector('button[type="submit"]'), originalLabel=button?.textContent; if(button){button.disabled=true;button.textContent='처리 중…';} try { const response=await request(); if(!response.ok){toast(await apiError(response, fallback));return false;} form.reset(); if(dialog.open) dialog.close(); toast(successMessage); return true; } catch (error) { toast(error.message || fallback); return false; } finally { form.dataset.submitting='false'; if(button){button.disabled=false;button.textContent=originalLabel;} } }
+function showFormStatus(form, message = '', tone = 'error') {
+  const status = form.querySelector('.form-status');
+  if (!status) return;
+  status.hidden = !message;
+  status.textContent = message;
+  status.dataset.tone = tone;
+}
+function fieldLabel(field) {
+  return field.closest('label')?.childNodes?.[0]?.textContent?.trim() || '입력 항목';
+}
+function validateSubmission(form) {
+  const invalid = [...form.elements].find(field => typeof field.checkValidity === 'function' && !field.checkValidity());
+  if (!invalid) return true;
+  const message = `${fieldLabel(invalid)}을(를) 확인해 주세요.`;
+  showFormStatus(form, message);
+  invalid.focus();
+  return false;
+}
+async function submitOnce(form, dialog, request, successMessage, fallback) { if(form.dataset.submitting === 'true') return false; form.dataset.submitting='true'; const button=form.querySelector('button[type="submit"]'), originalLabel=button?.textContent; showFormStatus(form, '처리 중입니다…', 'pending'); if(button){button.disabled=true;button.textContent='처리 중…';} try { const response=await request(); if(!response.ok){const message=await apiError(response, fallback); showFormStatus(form, message); toast(message);return false;} form.reset(); if(dialog.open) dialog.close(); toast(successMessage); return true; } catch (error) { const message=error.message || fallback; showFormStatus(form, message); toast(message); return false; } finally { form.dataset.submitting='false'; if(button){button.disabled=false;button.textContent=originalLabel;} } }
 function addFormValidationFeedback(form) {
   // 브라우저 기본 검증만으로는 모바일에서 제출이 막힌 이유가 잘 보이지 않을 수 있다.
   form.addEventListener('invalid', event => {
@@ -189,8 +207,9 @@ function addFormValidationFeedback(form) {
     form.dataset.validationNotified = 'true';
     setTimeout(() => { delete form.dataset.validationNotified; }, 0);
     const field = event.target;
-    const label = field.closest('label')?.childNodes?.[0]?.textContent?.trim() || '필수 항목';
-    toast(`${label}을(를) 확인해 주세요.`);
+    const message = `${fieldLabel(field)}을(를) 확인해 주세요.`;
+    showFormStatus(form, message);
+    toast(message);
   }, true);
 }
 
@@ -201,7 +220,9 @@ $('#post-form').addEventListener('submit', async event => {
   event.preventDefault();
   if (!signedInUser) { showAuth(); return toast('로그인 후 게시글을 등록할 수 있습니다.'); }
   if (!currentSpot) return toast('낚시터를 다시 선택한 뒤 게시글을 등록해 주세요.');
-  const form = event.currentTarget, data = new FormData(form), length = data.get('length');
+  const form = event.currentTarget;
+  if (!validateSubmission(form)) return;
+  const data = new FormData(form), length = data.get('length');
   const saved = await submitOnce(form, $('#post-modal'), async () => {
     const imageUrl = await uploadPostImage(data.get('image'));
     return fetch('/api/community/post', {
@@ -355,6 +376,7 @@ $('#rank-catch-form').addEventListener('submit', event => {
   event.preventDefault();
   if (!signedInUser) { showAuth(); return toast('로그인 후 조과를 등록할 수 있습니다.'); }
   const form = event.currentTarget;
+  if (!validateSubmission(form)) return;
   updateRankSpotAddress();
   if (!$('#rank-spot-id').value) return toast('목록에서 낚시 포인트를 선택해 주세요.');
   const data = new FormData(form);
