@@ -844,7 +844,13 @@ if __name__ == "__main__":
     host = os.environ.get("HOST", "127.0.0.1")
     sync_hour = int(os.environ.get("DAILY_SYNC_HOUR", "3"))
     sync_minute = int(os.environ.get("DAILY_SYNC_MINUTE", "30"))
-    print(f"http://{host}:{port} — 공식 데이터는 매일 {sync_hour:02d}:{sync_minute:02d} KST에 자동 동기화됩니다.")
+    # Render에서는 Cron Job이 동기화를 담당한다. 로컬 개발에서는 기존 예약 실행을 유지한다.
+    default_in_process_sync = "false" if os.environ.get("RENDER") else "true"
+    run_in_process_sync = os.environ.get("RUN_IN_PROCESS_SYNC", default_in_process_sync).lower() in ("1", "true", "yes")
+    print(f"http://{host}:{port} — 공식 데이터 동기화 시각은 매일 {sync_hour:02d}:{sync_minute:02d} KST입니다.")
     print("운영자는 긴급 갱신이 필요할 때만 /api/sync를 수동 실행할 수 있습니다.")
-    threading.Thread(target=scheduled_sync, daemon=True).start()
+    if run_in_process_sync:
+        threading.Thread(target=scheduled_sync, daemon=True).start()
+    else:
+        print("웹 서버의 예약 동기화는 비활성화됐습니다. Render Cron Job이 동기화를 실행합니다.")
     ThreadingHTTPServer((host, port), Handler).serve_forever()
