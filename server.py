@@ -762,6 +762,8 @@ class Handler(SimpleHTTPRequestHandler):
                 message = str(error)
                 if "email rate limit exceeded" in message.lower():
                     message = "인증 메일 발송 한도를 초과했습니다. 잠시 후 다시 시도해 주세요."
+                elif "email address not authorized" in message.lower():
+                    message = "Supabase 기본 메일 서비스는 프로젝트 팀 이메일에만 발송합니다. 실제 사용자에게 보내려면 Custom SMTP를 설정해 주세요."
                 elif "email not confirmed" in message.lower():
                     message = "이 이메일에는 이전 미인증 가입 기록이 있습니다. Supabase Authentication > Users에서 해당 사용자를 삭제한 뒤 다시 가입해 주세요."
                 return self.send_json({"error": message}, 400)

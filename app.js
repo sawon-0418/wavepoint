@@ -453,7 +453,14 @@ function showSignup() {
 function showEmailConfirmation(email) {
   $('#signup-form').hidden = true;
   $('#confirmation-email').textContent = email || '입력한 이메일';
+  showConfirmationStatus();
   $('#email-confirmation-panel').hidden = false;
+}
+function showConfirmationStatus(message = '', tone = 'error') {
+  const status = $('#confirmation-status');
+  status.hidden = !message;
+  status.textContent = message;
+  status.dataset.tone = tone;
 }
 $('#profile-button').addEventListener('click', () => {
   if (!signedInUser) return showAuth();
@@ -569,12 +576,13 @@ $('#resend-confirmation').addEventListener('click', async event => {
   const button = event.currentTarget;
   if (!email || button.disabled) return;
   button.disabled = true;
+  showConfirmationStatus('인증 메일 재전송을 요청하고 있습니다…', 'pending');
   try {
     const response = await fetch('/api/auth/resend-confirmation', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email})});
     const result = await response.json();
-    if (response.ok) { toast('인증 메일을 다시 보냈습니다.'); startEmailCooldown(button); }
-    else toast(result.error || '인증 메일을 보내지 못했습니다.');
-  } catch { toast('인증 서버에 연결하지 못했습니다.'); }
+    if (response.ok) { showConfirmationStatus('재전송 요청을 전달했습니다. 스팸함도 확인해 주세요.', 'pending'); toast('인증 메일 재전송을 요청했습니다.'); startEmailCooldown(button); }
+    else { const message = result.error || '인증 메일을 보내지 못했습니다.'; showConfirmationStatus(message); toast(message); }
+  } catch { showConfirmationStatus('인증 서버에 연결하지 못했습니다.'); toast('인증 서버에 연결하지 못했습니다.'); }
   finally { if (!button.dataset.cooldown) button.disabled = false; }
 });
 document.querySelectorAll('[data-open-policy]').forEach(button => button.addEventListener('click', () => $(`#${button.dataset.openPolicy}`).showModal()));
