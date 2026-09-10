@@ -52,3 +52,4 @@ nav button.active, nav button:hover { color: #008b87; background: #e5f0e6; borde
 .form-status{margin:0;padding:10px 11px;border:1px solid #d68b84;background:#fff1ef;color:#9e3026;font-size:12px;line-height:1.5}.form-status[data-tone="pending"]{border-color:#9bbcc0;background:#edf8f8;color:#17666b}
 .image-selection{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #d9e3dc;background:#f5faf7}.image-selection img{width:54px;height:54px;object-fit:cover;border:1px solid #cfdad2}.image-selection button{border:1px solid #008b87;background:#fff;color:#00756f;padding:7px 9px;font:700 11px inherit;cursor:pointer}
 .admin-member-count{display:inline-block;margin-left:5px;color:#8b9898;font:500 9px "Noto Sans KR",sans-serif;letter-spacing:0;vertical-align:2px;white-space:nowrap}
+.admin-member-count[hidden]{display:none!important}
