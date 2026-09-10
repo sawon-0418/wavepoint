@@ -428,11 +428,13 @@ function startEmailCooldown(button, seconds = 60) {
 }
 function applySession(user) {
   signedInUser = user || null;
-  const profile = $('#profile-button'), adminTab = $('#admin-tab');
+  const profile = $('#profile-button'), adminTab = $('#admin-tab'), memberCount = $('#admin-member-count');
   profile.classList.toggle('is-admin', signedInUser?.role === 'admin');
   profile.innerHTML = signedInUser ? `${escapeHTML(signedInUser.displayName)}<span>${signedInUser.role === 'admin' ? '운영자' : '내 프로필'}</span>` : '로그인';
   profile.setAttribute('aria-label', signedInUser ? '내 프로필 및 로그아웃' : '로그인');
   adminTab.hidden = signedInUser?.role !== 'admin';
+  memberCount.hidden = signedInUser?.role !== 'admin';
+  if (signedInUser?.role !== 'admin') memberCount.textContent = '회원 0명';
   fillLoggedInAuthor();
   if (signedInUser?.role === 'admin') loadAdminOverview();
 }
@@ -628,6 +630,7 @@ async function loadAdminOverview() {
   $('#admin-report-count').textContent = pendingReports.length;
   $('#admin-inquiry-count').textContent = pendingInquiries.length;
   $('#admin-spot-count').textContent = (data.spots || []).length;
+  $('#admin-member-count').textContent = `회원 ${Number(data.memberCount || 0).toLocaleString('ko-KR')}명`;
   $('#admin-reports').innerHTML = `${pendingReports.length ? pendingReports.map(adminReportItem).join('') : '<p class="empty-post">미처리 신고가 없습니다.</p>'}${resolvedReports.length ? `<details class="admin-history"><summary>처리 이력 ${resolvedReports.length}건</summary>${resolvedReports.map(adminReportItem).join('')}</details>` : ''}`;
   $('#admin-inquiries').innerHTML = `${pendingInquiries.length ? pendingInquiries.map(item => adminItem(item.kind || '문의', `${memberLabel(item)} · ${item.message}${item.contact ? ` · ${item.contact}` : ''}`, '처리 완료', 'resolve-inquiry', item.id)).join('') : '<p class="empty-post">미처리 문의가 없습니다.</p>'}${resolvedInquiries.length ? `<details class="admin-history"><summary>처리 이력 ${resolvedInquiries.length}건</summary>${resolvedInquiries.map(item => adminItem(item.kind || '문의', `${memberLabel(item)} · ${item.message}${item.admin_note ? ` · 메모: ${item.admin_note}` : ''}`, '', '', item.id)).join('')}</details>` : ''}`;
   $('#admin-spots').innerHTML = (data.spots || []).length ? data.spots.map(adminSpotItem).join('') : '<p class="empty-post">사용자 공유 포인트가 없습니다.</p>';

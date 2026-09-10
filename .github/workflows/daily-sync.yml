@@ -24,3 +24,18 @@ jobs:
           curl --fail-with-body --silent --show-error --max-time 600 \
             --request POST "$WAVEPOINT_SYNC_URL" \
             --header "X-Cron-Sync-Token: $CRON_SYNC_TOKEN"
+
+  cleanup-pending-users:
+    name: Remove expired unverified users
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Remove users pending email verification for 24 hours
+        run: python cleanup_pending_users.py

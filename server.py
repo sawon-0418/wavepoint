@@ -94,6 +94,17 @@ def supabase_auth(path, method="GET", body=None, access_token=None):
             pass
         raise RuntimeError(f"인증 요청 실패: {detail}") from error
 
+def confirmed_member_count():
+    """운영자 전용 표시용: 이메일 또는 전화 인증까지 끝난 Auth 사용자만 센다."""
+    page, count = 1, 0
+    while True:
+        result = supabase_auth(f"admin/users?page={page}&per_page=1000") or {}
+        users = result.get("users", [])
+        count += sum(bool(user.get("email_confirmed_at") or user.get("phone_confirmed_at")) for user in users)
+        if len(users) < 1000:
+            return count
+        page += 1
+
 def user_profile(user):
     user_id = str((user or {}).get("id") or "")
     if not user_id: return None
@@ -641,13 +652,14 @@ class Handler(SimpleHTTPRequestHandler):
                 spots = supabase_request("community_spots?select=*&order=created_at.desc&limit=50") or []
                 posts = supabase_request("posts?select=id,is_hidden&order=created_at.desc&limit=200") or []
                 audits = supabase_request("admin_audit_logs?select=*&order=created_at.desc&limit=50") or []
+                member_count = confirmed_member_count()
                 attach_member_labels(reports, inquiries, spots)
                 post_visibility = {str(post["id"]): bool(post.get("is_hidden")) for post in posts}
                 spot_visibility = {str(spot["id"]): bool(spot.get("is_hidden")) for spot in spots}
                 for report in reports:
                     target_id = str(report.get("target_id") or "")
                     report["target_hidden"] = post_visibility.get(target_id, False) if report.get("kind") == "post" else spot_visibility.get(target_id, False)
-                return self.send_json({"reports": reports, "inquiries": inquiries, "spots": spots, "audits": audits})
+                return self.send_json({"reports": reports, "inquiries": inquiries, "spots": spots, "audits": audits, "memberCount": member_count})
             except RuntimeError as error:
                 return self.send_json({"error": str(error)}, 503)
         if self.path.startswith("/api/community-spots"):
