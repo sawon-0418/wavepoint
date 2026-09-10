@@ -89,6 +89,7 @@ function showSpotDetail(spot) {
   addressButton.dataset.lng = spot.lng;
   $('#detail-region').textContent = `${spot.kind === 'sea' ? '해양' : '내수면'} · 등록 어종: ${spot.species}`;
   $('#detail-regulations').innerHTML = rules.map(rule => `<div class="regulation-row"><b>${rule.label}</b><span>${rule.size}${rule.closed ? ` · ${dateInRange(rule.closed) ? '<strong style="color:#c9473e">현재 금어기</strong>' : `금어기 ${rule.closed[0]}~${rule.closed[1]}`}` : ''}</span></div>`).join('');
+  renderSpotRecommendation(spot);
   loadSpotPosts(spot.id);
   $('#spot-detail-modal').showModal();
 }
@@ -98,9 +99,27 @@ $('#detail-owner-profile').addEventListener('click', event => {
   const ownerId = event.currentTarget.dataset.ownerId;
   if (ownerId) openAnglerProfile(ownerId);
 });
+$('#recommend-spot-button').addEventListener('click', async () => {
+  if (!currentSpot) return;
+  if (!signedInUser) { showAuth(); return toast('로그인 후 포인트를 추천할 수 있습니다.'); }
+  const button = $('#recommend-spot-button');
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    const response = await fetch('/api/community/recommend-spot', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({spotId:currentSpot.id})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '포인트 추천에 실패했습니다.');
+    spotRecommendationCounts[String(currentSpot.id)] = Number(result.count || 0);
+    if (result.recommended) recommendedSpotIds.add(String(currentSpot.id)); else recommendedSpotIds.delete(String(currentSpot.id));
+    renderSpotRecommendation(currentSpot);
+    loadSpotRanking();
+    toast(result.recommended ? '이 포인트를 추천했습니다.' : '포인트 추천을 취소했습니다.');
+  } catch (error) { toast(error.message || '포인트 추천에 실패했습니다.'); }
+  finally { button.disabled = false; }
+});
 function displayProtectedAreas(geojson) { if(!map)return; const legend=$('#protected-legend'); protectedLayers.forEach(layer=>layer.setMap(null)); protectedLayers=[]; const addPolygon=(paths,name)=>{const layer=new naver.maps.Polygon({map,paths,zIndex:1,strokeColor:'#c94239',strokeWeight:1.5,strokeStyle:'shortdash',fillColor:'#e04f45',fillOpacity:.26}); naver.maps.Event.addListener(layer,'click',()=>toast(`⚠ ${name||'수산자원보호구역'}`)); protectedLayers.push(layer);}; if(!geojson.features?.length) { if(legend)legend.innerHTML='<span></span> 포획·출입 제한 구역 (예시)'; restrictedZones.forEach(zone=>addPolygon(zone.points.map(([lat,lng])=>new naver.maps.LatLng(lat,lng)),`예시 · ${zone.name}`)); return; } if(legend)legend.innerHTML='<span></span> 수산자원보호구역 (공식 WFS)'; geojson.features.forEach(feature=>{const geometry=feature.geometry||{};const name=feature.properties?.name||feature.properties?.NAME||'수산자원보호구역';const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.type==='MultiPolygon'?geometry.coordinates:[];polygons.forEach(polygon=>addPolygon(polygon[0].map(([lng,lat])=>new naver.maps.LatLng(lat,lng)),name));}); }
 async function enrichOfficialAddresses(){ const targets=spots.filter(spot=>isOfficialSpot(spot)&&spot.address==='공식 API 등록 포인트'); if(!targets.length)return; try { toast(`주소가 비어 있는 ${targets.length}개 포인트를 보완하고 있어요.`); const result=await fetch('/api/address-enrichment',{method:'POST'}).then(response=>response.json()); const refreshed=await fetch('/api/spots').then(response=>response.json()); const officialById=new Map((refreshed.items||[]).map(spot=>[String(spot.id),spot])); spots.forEach((spot,index)=>{const newer=officialById.get(String(spot.id));if(newer)spots[index]={...spot,...newer,source:'official'};}); renderSpots(); const reason=Array.isArray(result.errors)&&result.errors[0]; toast(result.updated?`${result.updated}개 포인트의 주소를 네이버 지도로 보완했어요.`:reason||'주소 보완 결과가 없습니다. 네이버 API 설정을 확인해주세요.'); } catch { toast('서버의 네이버 주소 보완을 시작하지 못했습니다. 서버를 다시 실행한 뒤 재시도해주세요.'); } }
-async function loadOfficialData() { try { const [spotsResponse, areasResponse] = await Promise.all([fetch('/api/spots'), fetch('/api/protected-areas')]); const official = await spotsResponse.json(); const areas = await areasResponse.json(); const known = new Set(spots.map(spot => `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`)); (official.items || []).forEach(spot => { const index = spots.findIndex(existing => String(existing.id) === String(spot.id)); const key = `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`; if(index >= 0) spots[index] = {...spots[index],...spot,source:'official'}; else if(!known.has(key)) spots.push({...spot,source:'official'}); }); renderSpots(); displayProtectedAreas(areas); await enrichOfficialAddresses(); } catch { displayProtectedAreas({features:[]}); } }
+async function loadOfficialData() { try { const [spotsResponse, areasResponse] = await Promise.all([fetch('/api/spots'), fetch('/api/protected-areas')]); const official = await spotsResponse.json(); const areas = await areasResponse.json(); const known = new Set(spots.map(spot => `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`)); (official.items || []).forEach(spot => { const index = spots.findIndex(existing => String(existing.id) === String(spot.id)); const key = `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`; if(index >= 0) spots[index] = {...spots[index],...spot,source:'official'}; else if(!known.has(key)) spots.push({...spot,source:'official'}); }); renderSpots(); displayProtectedAreas(areas); await loadSpotRecommendations(); await enrichOfficialAddresses(); } catch { displayProtectedAreas({features:[]}); loadSpotRecommendations(); } }
 // 등록용 지도 안에서 장소를 찾고, 검색 결과는 이 지도만 이동시킨다.
 async function searchSpotLocation() {
   const query=$('#spot-location-query').value.trim(), results=$('#spot-location-results');
@@ -148,7 +167,33 @@ init();
 $('#spot-list').addEventListener('click', event => { const item = event.target.closest('.spot-item'); if(!item) return; event.stopImmediatePropagation(); const spot = spots.find(value => String(value.id) === String(item.dataset.id)); if(spot) showSpotDetail(spot); }, true);
 
 let currentSpot = null, reportTarget = null;
+let spotRecommendationCounts = {}, recommendedSpotIds = new Set();
 function safeImageUrl(value) { try { const url = new URL(value); return /^https?:$/.test(url.protocol) ? url.href : ''; } catch { return ''; } }
+function spotRecommendationCount(spotId) { return Number(spotRecommendationCounts[String(spotId)] || 0); }
+function renderSpotRecommendation(spot) {
+  const button = $('#recommend-spot-button');
+  if (!spot) { button.hidden = true; return; }
+  const recommended = recommendedSpotIds.has(String(spot.id));
+  const count = spotRecommendationCount(spot.id);
+  button.hidden = false;
+  button.classList.toggle('recommended', recommended);
+  button.innerHTML = `${recommended ? '♥ 추천했어요' : '♡ 이 포인트 추천하기'} <span>${count}</span>`;
+  $('#detail-recommend-count').textContent = count;
+}
+async function loadSpotRecommendations() {
+  try {
+    const response = await fetch('/api/spot-recommendations');
+    const result = await response.json();
+    if (!response.ok || result.error) throw new Error(result.error || '추천 정보를 불러오지 못했습니다.');
+    spotRecommendationCounts = result.counts || {};
+    recommendedSpotIds = new Set((result.recommendedSpotIds || []).map(String));
+  } catch {
+    spotRecommendationCounts = {};
+    recommendedSpotIds = new Set();
+  }
+  if (currentSpot) renderSpotRecommendation(currentSpot);
+  loadSpotRanking();
+}
 async function loadSpotPosts(spotId) {
   const container = $('#spot-posts'); container.innerHTML = '<p class="empty-post">게시글을 불러오는 중…</p>';
   try {
@@ -343,6 +388,22 @@ async function loadHeroRanking() {
     }));
   } catch { list.innerHTML='<p>랭킹을 불러오지 못했습니다.</p>'; }
 }
+function loadSpotRanking() {
+  const list = $('#hero-spot-ranking-list');
+  if (!list) return;
+  const ranked = spots
+    .map(spot => ({spot, count: spotRecommendationCount(spot.id)}))
+    .filter(item => item.count > 0)
+    .sort((left, right) => right.count - left.count || String(left.spot.title).localeCompare(String(right.spot.title), 'ko'))
+    .slice(0, 5);
+  list.innerHTML = ranked.length
+    ? ranked.map((item, index) => `<button class="hero-rank hero-spot-rank" type="button" data-rank-spot="${escapeHTML(item.spot.id)}"><b>${String(index + 1).padStart(2, '0')}</b><span>${escapeHTML(item.spot.title)}</span><strong>${item.count} <small>추천</small></strong></button>`).join('')
+    : '<p>아직 추천된 포인트가 없습니다.</p>';
+  list.querySelectorAll('[data-rank-spot]').forEach(button => button.addEventListener('click', () => {
+    const spot = spots.find(item => String(item.id) === String(button.dataset.rankSpot));
+    if (spot) showSpotDetail(spot);
+  }));
+}
 setTimeout(loadHeroRanking, 1400);
 
 function rankSpotLabel(spot) { return `${spot.title}${spot.address ? ` · ${spot.address}` : ''}`; }
@@ -436,6 +497,12 @@ function applySession(user) {
   memberCount.hidden = signedInUser?.role !== 'admin';
   if (signedInUser?.role !== 'admin') memberCount.textContent = '회원 0명';
   fillLoggedInAuthor();
+  // 추천 여부는 로그인한 사용자별로 달라지므로 세션 변경 직후 갱신한다.
+  if (signedInUser) loadSpotRecommendations();
+  else {
+    recommendedSpotIds = new Set();
+    if (currentSpot) renderSpotRecommendation(currentSpot);
+  }
   if (signedInUser?.role === 'admin') loadAdminOverview();
 }
 async function refreshSession() {
@@ -474,6 +541,52 @@ $('#profile-catches').addEventListener('click', () => {
   if (!signedInUser) return;
   $('#profile-modal').close();
   openAnglerProfile(signedInUser.id);
+});
+$('#open-account-edit').addEventListener('click', () => {
+  if (!signedInUser) return showAuth();
+  $('#profile-modal').close();
+  $('#account-verify-form').reset();
+  $('#account-update-form').reset();
+  $('#account-verify-form').hidden = false;
+  $('#account-update-form').hidden = true;
+  showFormStatus($('#account-verify-form'));
+  showFormStatus($('#account-update-form'));
+  $('#account-edit-modal').showModal();
+});
+$('#account-verify-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget, button = form.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = '확인 중…'; showFormStatus(form, '비밀번호를 확인하고 있습니다…', 'pending');
+  try {
+    const response = await fetch('/api/auth/verify-account-password', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(Object.fromEntries(new FormData(form)))});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '비밀번호를 확인하지 못했습니다.');
+    form.hidden = true;
+    const updateForm = $('#account-update-form');
+    updateForm.hidden = false;
+    updateForm.elements.nickname.value = signedInUser?.displayName || '';
+    showFormStatus(updateForm);
+    toast('본인 인증이 완료되었습니다.');
+  } catch (error) { showFormStatus(form, error.message || '비밀번호를 확인하지 못했습니다.'); toast(error.message || '비밀번호를 확인하지 못했습니다.'); }
+  finally { button.disabled = false; button.textContent = '본인 인증'; }
+});
+$('#account-update-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget, data = new FormData(form), password = String(data.get('newPassword') || ''), confirmation = String(data.get('newPasswordConfirm') || ''), button = form.querySelector('button[type="submit"]');
+  if (password !== confirmation) return showFormStatus(form, '새 비밀번호가 서로 일치하지 않습니다.');
+  if (!String(data.get('nickname') || '').trim() && !password) return showFormStatus(form, '변경할 닉네임 또는 비밀번호를 입력해 주세요.');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = '저장 중…'; showFormStatus(form, '변경사항을 저장하고 있습니다…', 'pending');
+  try {
+    const response = await fetch('/api/auth/update-account', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nickname:String(data.get('nickname') || '').trim(), newPassword:password})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '회원정보를 저장하지 못했습니다.');
+    applySession(result.user || signedInUser);
+    form.reset(); $('#account-edit-modal').close();
+    toast('회원정보를 변경했습니다.');
+  } catch (error) { showFormStatus(form, error.message || '회원정보를 저장하지 못했습니다.'); toast(error.message || '회원정보를 저장하지 못했습니다.'); }
+  finally { button.disabled = false; button.textContent = '변경사항 저장'; }
 });
 $('#profile-logout').addEventListener('click', async () => {
   const button = $('#profile-logout');

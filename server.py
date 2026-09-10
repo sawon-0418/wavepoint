@@ -584,6 +584,10 @@ class Handler(SimpleHTTPRequestHandler):
         cookie = SimpleCookie(self.headers.get("Cookie", ""))
         return cookie.get("wave_signup_verification").value if cookie.get("wave_signup_verification") else ""
 
+    def account_verification_token(self):
+        cookie = SimpleCookie(self.headers.get("Cookie", ""))
+        return cookie.get("wave_account_verification").value if cookie.get("wave_account_verification") else ""
+
     def require_user(self):
         user = self.session_user()
         if not user:
@@ -675,6 +679,18 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"items": spots})
             except RuntimeError as error:
                 return self.send_json({"items": [], "error": str(error)}, 503)
+        if self.path.startswith("/api/spot-recommendations"):
+            try:
+                rows = supabase_request("spot_recommendations?select=spot_id,user_id") or []
+                counts = {}
+                for row in rows:
+                    spot_id = str(row.get("spot_id") or "")
+                    counts[spot_id] = counts.get(spot_id, 0) + 1
+                viewer = self.session_user()
+                recommended = [str(row.get("spot_id")) for row in rows if viewer and str(row.get("user_id")) == viewer["id"]]
+                return self.send_json({"counts": counts, "recommendedSpotIds": recommended})
+            except RuntimeError as error:
+                return self.send_json({"counts": {}, "recommendedSpotIds": [], "error": str(error)}, 503)
         if self.path.startswith("/api/angler-profile"):
             user_id = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get("id", [""])[0]
             if not re.fullmatch(r"[0-9a-fA-F-]{36}", user_id):
@@ -770,6 +786,43 @@ class Handler(SimpleHTTPRequestHandler):
                 if action == "signout":
                     self.clear_session_cookies()
                     return self.send_json({"ok": True})
+                if action == "verify-account-password":
+                    user = self.require_user()
+                    if not user: return
+                    password = str(payload.get("password", ""))
+                    if not password: return self.send_json({"error": "현재 비밀번호를 입력해 주세요."}, 400)
+                    result = supabase_auth("token?grant_type=password", "POST", {"email": user["email"], "password": password})
+                    verified_user = (result or {}).get("user") or {}
+                    if str(verified_user.get("id") or "") != user["id"]:
+                        return self.send_json({"error": "본인 인증을 확인하지 못했습니다."}, 403)
+                    self.queue_session_cookies(result)
+                    self.queue_cookie("wave_account_verification", result.get("access_token", ""), 300)
+                    return self.send_json({"ok": True, "expiresIn": 300})
+                if action == "update-account":
+                    user = self.require_user()
+                    if not user: return
+                    verification_token = self.account_verification_token()
+                    if not verification_token: return self.send_json({"error": "변경 전 비밀번호로 본인 인증을 해주세요."}, 401)
+                    verified_user = supabase_auth("user", access_token=verification_token)
+                    if str(verified_user.get("id") or "") != user["id"]:
+                        return self.send_json({"error": "본인 인증이 만료되었습니다. 다시 인증해 주세요."}, 401)
+                    nickname = str(payload.get("nickname", "")).strip()[:24]
+                    new_password = str(payload.get("newPassword", ""))
+                    if not nickname and not new_password:
+                        return self.send_json({"error": "변경할 닉네임 또는 비밀번호를 입력해 주세요."}, 400)
+                    if nickname and len(nickname) < 2:
+                        return self.send_json({"error": "닉네임은 2자 이상 입력해 주세요."}, 400)
+                    if new_password and len(new_password) < 8:
+                        return self.send_json({"error": "새 비밀번호는 8자 이상 입력해 주세요."}, 400)
+                    update = {}
+                    if nickname: update["data"] = {"display_name": nickname}
+                    if new_password: update["password"] = new_password
+                    supabase_auth("user", "PUT", update, access_token=verification_token)
+                    if nickname:
+                        supabase_request(f"profiles?id=eq.{urllib.parse.quote(user['id'], safe='')}", "PATCH", {"display_name": nickname})
+                    self.queue_cookie("wave_account_verification", "", 0)
+                    refreshed = user_profile(supabase_auth("user", access_token=verification_token))
+                    return self.send_json({"ok": True, "user": refreshed})
             except (ValueError, json.JSONDecodeError, RuntimeError) as error:
                 message = str(error)
                 if "email rate limit exceeded" in message.lower():
@@ -905,6 +958,24 @@ class Handler(SimpleHTTPRequestHandler):
                 if action == "like":
                     result = supabase_request("rpc/increment_post_like", "POST", {"post_id": str(payload.get("postId", ""))})
                     return self.send_json({"likes": result})
+                if action == "recommend-spot":
+                    if not self.require_rate_limit(user, "recommend-spot", 100, 3600): return
+                    spot_id = str(payload.get("spotId", ""))[:120]
+                    if not spot_id: return self.send_json({"error": "추천할 포인트를 찾지 못했습니다."}, 400)
+                    encoded_id = urllib.parse.quote(spot_id, safe='')
+                    official = supabase_request(f"official_spots?id=eq.{encoded_id}&select=id") or []
+                    community = supabase_request(f"community_spots?id=eq.{encoded_id}&select=id,is_hidden") or []
+                    if not official and (not community or community[0].get("is_hidden")):
+                        return self.send_json({"error": "추천할 수 없는 포인트입니다."}, 404)
+                    existing = supabase_request(f"spot_recommendations?spot_id=eq.{encoded_id}&user_id=eq.{urllib.parse.quote(user['id'], safe='')}&select=id") or []
+                    if existing:
+                        supabase_request(f"spot_recommendations?id=eq.{urllib.parse.quote(str(existing[0]['id']), safe='')}", "DELETE", None, "return=minimal")
+                        recommended = False
+                    else:
+                        supabase_request("spot_recommendations", "POST", {"spot_id": spot_id, "user_id": user["id"]})
+                        recommended = True
+                    count = len(supabase_request(f"spot_recommendations?spot_id=eq.{encoded_id}&select=id") or [])
+                    return self.send_json({"recommended": recommended, "count": count})
             except RuntimeError as error:
                 return self.send_json({"error": str(error)}, 503)
             return self.send_json({"error": "지원하지 않는 요청입니다."}, 404)
