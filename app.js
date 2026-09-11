@@ -89,9 +89,10 @@ function showSpotDetail(spot) {
   addressButton.dataset.lng = spot.lng;
   $('#detail-region').textContent = `${spot.kind === 'sea' ? '해양' : '내수면'} · 등록 어종: ${spot.species}`;
   $('#detail-regulations').innerHTML = rules.map(rule => `<div class="regulation-row"><b>${rule.label}</b><span>${rule.size}${rule.closed ? ` · ${dateInRange(rule.closed) ? '<strong style="color:#c9473e">현재 금어기</strong>' : `금어기 ${rule.closed[0]}~${rule.closed[1]}`}` : ''}</span></div>`).join('');
-  renderSpotRecommendation(spot);
-  loadSpotPosts(spot.id);
   $('#spot-detail-modal').showModal();
+  // 추천 정보 로딩에 문제가 생겨도 포인트 상세 화면 자체는 반드시 열려야 한다.
+  try { renderSpotRecommendation(spot); } catch { /* 추천 UI는 다음 새로고침에 복구한다. */ }
+  loadSpotPosts(spot.id);
 }
 function focusSpotOnMap(spot, zoom = 16, closeDetail = true) { switchTab('map-section'); if(closeDetail) $('#spot-detail-modal').close(); setMapView(spot.lat,spot.lng,zoom); const marker = markers.find(item => Math.abs(item.getPosition().lat() - Number(spot.lat)) < .00001 && Math.abs(item.getPosition().lng() - Number(spot.lng)) < .00001); if(marker) openSpotInfo(spot,marker); }
 $('#detail-address').addEventListener('click', event => { const button = event.currentTarget; focusSpotOnMap({lat: button.dataset.lat, lng: button.dataset.lng}); });
@@ -172,13 +173,15 @@ function safeImageUrl(value) { try { const url = new URL(value); return /^https?
 function spotRecommendationCount(spotId) { return Number(spotRecommendationCounts[String(spotId)] || 0); }
 function renderSpotRecommendation(spot) {
   const button = $('#recommend-spot-button');
+  if (!button) return;
   if (!spot) { button.hidden = true; return; }
   const recommended = recommendedSpotIds.has(String(spot.id));
   const count = spotRecommendationCount(spot.id);
   button.hidden = false;
   button.classList.toggle('recommended', recommended);
   button.innerHTML = `${recommended ? '♥ 추천했어요' : '♡ 이 포인트 추천하기'} <span>${count}</span>`;
-  $('#detail-recommend-count').textContent = count;
+  const countNode = $('#detail-recommend-count');
+  if (countNode) countNode.textContent = count;
 }
 async function loadSpotRecommendations() {
   try {
