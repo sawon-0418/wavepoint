@@ -1,0 +1,25 @@
+name: Keep Render awake during Korean daytime
+
+on:
+  # GitHub Actions cron은 UTC 기준이다.
+  # KST 05:00~23:50에만 10분 간격으로 실행한다.
+  # (KST 자정에는 마지막 23:50 요청이 15분간 서비스를 유지하므로 별도 호출하지 않는다.)
+  schedule:
+    - cron: "*/10 20-23 * * *"
+    - cron: "*/10 0-14 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Ping Render health endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Keep service responsive during daytime
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            --retry 2 --retry-delay 10 \
+            "https://wavepoint-aghq.onrender.com/api/health"

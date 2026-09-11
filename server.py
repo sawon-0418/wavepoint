@@ -617,6 +617,9 @@ class Handler(SimpleHTTPRequestHandler):
         return False
 
     def do_GET(self):
+        # 배포 상태 확인용 경량 엔드포인트. 인증·외부 API·DB 조회를 하지 않는다.
+        if self.path == "/api/health":
+            return self.send_json({"ok": True})
         if self.path.startswith("/api/auth/me"):
             user = self.session_user()
             return self.send_json({"user": user})
