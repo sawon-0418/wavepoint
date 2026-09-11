@@ -19,8 +19,8 @@ nav button.active, nav button:hover { color: #008b87; background: #e5f0e6; borde
 .regulation-list { display: grid; gap: 8px; padding-top: 12px; }.regulation-row { display: grid; grid-template-columns: 82px 1fr; gap: 8px; font-size: 12px; }.regulation-row b { color: #008b87; }.regulation-row span { color: #41565a; line-height: 1.5; }
 .legal-note { margin: 13px 0 0; color: #68777b; font-size: 10px; line-height: 1.65; }
 .region-cluster-wrap { background: transparent; border: 0; }
-.region-cluster { width: 76px; min-height: 52px; border: 2px solid #fff; border-radius: 15px; background: #007d79; box-shadow: 0 3px 9px #1237; color: #fff; cursor: pointer; font-family: "Noto Sans KR", sans-serif; line-height: 1.15; pointer-events: auto; }
-.region-cluster b,.region-cluster span { display: block; }.region-cluster b { font-size: 12px; }.region-cluster span { margin-top: 3px; color: #d4f3ee; font-size: 10px; }
+.region-cluster { width: 58px; min-height: 40px; padding: 5px 6px; border: 2px solid #fff; border-radius: 11px; background: #007d79; box-shadow: 0 2px 6px #1237; color: #fff; cursor: pointer; font-family: "Noto Sans KR", sans-serif; line-height: 1.1; pointer-events: auto; }
+.region-cluster b,.region-cluster span { display: block; }.region-cluster b { font-size: 10px; }.region-cluster span { margin-top: 2px; color: #d4f3ee; font-size: 8px; }
 .region-focus { margin: 2px 0 12px; }.region-count { margin: 0 0 8px; color: #617174; font-size: 12px; }
 .region-spot-list { max-height: 330px; overflow: auto; border-top: 1px solid #e1e8e3; }
 .region-spot-item { display: block; width: 100%; padding: 12px 2px; border: 0; border-bottom: 1px solid #e1e8e3; background: transparent; color: #213e42; text-align: left; cursor: pointer; font-family: "Noto Sans KR", sans-serif; }
