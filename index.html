@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="overrides.css?v=20260911-centered-region-clusters" />
+    <link rel="stylesheet" href="overrides.css?v=20260911-map-hint-position" />
   </head>
   <body>
     <header class="topbar">
@@ -45,8 +45,8 @@
           <div class="map-column">
             <div class="map-navigation"><button id="map-back-button" class="text-button" type="button">← 뒤로 가기</button><button id="clear-region-filter" class="text-button" type="button">전국 보기</button><button id="locate-btn" type="button" hidden aria-hidden="true" tabindex="-1">내 위치로 이동</button></div>
             <div id="map" aria-label="낚시 포인트 지도"></div>
+            <div class="map-hint">마커를 누르면 해당 포인트의 상세 정보를 볼 수 있어요</div>
           </div>
-          <div class="map-hint">마커를 누르면 해당 포인트의 상세 정보를 볼 수 있어요</div>
         </div>
       </section>
 
