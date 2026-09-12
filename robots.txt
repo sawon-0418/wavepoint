@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://wavepoint-aghq.onrender.com/sitemap.xml
