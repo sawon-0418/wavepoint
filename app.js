@@ -404,7 +404,7 @@ async function loadHeroRanking() {
     const ranked=userCatchRanking(result.posts||[]), topFive=ranked.slice(0,5);
     const topMarkup=topFive.map((post,index)=>`<button class="hero-rank" type="button" data-rank-post="${escapeHTML(post.id)}"><b>${String(index+1).padStart(2,'0')}</b><span>${escapeHTML(post.author||'익명 낚시꾼')} · ${escapeHTML(post.species||'조과')}</span><strong>${Number(post.length).toFixed(1)} <small>cm</small></strong></button>`).join('');
     const myIndex=ranked.findIndex(post => result.viewerId && post.author_id === result.viewerId);
-    const myMarkup=result.viewerId ? (myIndex >= 0 ? `<button class="hero-rank hero-my-rank" type="button" data-rank-post="${escapeHTML(ranked[myIndex].id)}"><b>내 ${myIndex+1}위</b><span>${escapeHTML(ranked[myIndex].species||'조과')} · 내 최고 조과</span><strong>${Number(ranked[myIndex].length).toFixed(1)} <small>cm</small></strong></button>` : '<p class="my-rank-empty">내 조과를 등록하면 현재 순위를 확인할 수 있어요.</p>') : '';
+    const myMarkup=result.viewerId ? (myIndex >= 0 ? `<button class="hero-rank hero-my-rank" type="button" data-rank-post="${escapeHTML(ranked[myIndex].id)}"><b>현재 내 순위: ${myIndex+1}위</b><span>${escapeHTML(ranked[myIndex].species||'조과')} · 내 최고 조과</span><strong>${Number(ranked[myIndex].length).toFixed(1)} <small>cm</small></strong></button>` : '<p class="my-rank-empty">내 조과를 등록하면 현재 순위를 확인할 수 있어요.</p>') : '';
     list.innerHTML=ranked.length ? `${topMarkup}${myMarkup}` : '<p>등록된 조과가 아직 없습니다.</p>';
     list.querySelectorAll('[data-rank-post]').forEach(button => button.addEventListener('click', () => {
       const post=(result.posts||[]).find(item => String(item.id) === button.dataset.rankPost);
