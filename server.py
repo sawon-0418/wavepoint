@@ -1026,6 +1026,26 @@ class Handler(SimpleHTTPRequestHandler):
                     item = {"id": str(uuid.uuid4()), "spot_id": str(payload.get("spotId", "")), "author": user["displayName"], "author_id": user["id"], "content": str(payload.get("content", ""))[:800], "species": str(payload.get("species", ""))[:30], "length": payload.get("length"), "length_is_ai": bool(payload.get("lengthIsAi")), "image_url": str(payload.get("imageUrl", ""))[:1000] or None}
                     if not item["spot_id"] or not item["content"]: return self.send_json({"error": "낚시터와 글 내용은 필수입니다."}, 400)
                     return self.send_json({"post": supabase_request("posts", "POST", item)[0]}, 201)
+                if action == "update-post":
+                    if not self.require_rate_limit(user, "update-post", 20, 3600): return
+                    post_id = str(payload.get("postId", ""))
+                    post_rows = supabase_request(f"posts?id=eq.{urllib.parse.quote(post_id, safe='')}&select=id,author_id,image_url") or []
+                    if not post_rows: return self.send_json({"error": "수정할 게시글을 찾지 못했습니다."}, 404)
+                    previous = post_rows[0]
+                    if str(previous.get("author_id") or "") != user["id"]:
+                        return self.send_json({"error": "본인이 작성한 게시글만 수정할 수 있습니다."}, 403)
+                    content = str(payload.get("content", ""))[:800]
+                    if not content: return self.send_json({"error": "게시글 내용을 입력해 주세요."}, 400)
+                    new_image = str(payload.get("imageUrl", ""))[:1000]
+                    if new_image and not new_image.startswith(f"{supabase_base_url()}/storage/v1/object/public/post-images/"):
+                        return self.send_json({"error": "올바른 게시글 사진이 아닙니다."}, 400)
+                    remove_image = bool(payload.get("removeImage"))
+                    image_url = new_image or (None if remove_image else previous.get("image_url"))
+                    item = {"content": content, "species": str(payload.get("species", ""))[:30], "length": payload.get("length"), "length_is_ai": False, "image_url": image_url}
+                    updated = supabase_request(f"posts?id=eq.{urllib.parse.quote(post_id, safe='')}", "PATCH", item)
+                    if previous.get("image_url") and previous.get("image_url") != image_url:
+                        delete_post_image(previous.get("image_url"))
+                    return self.send_json({"post": updated[0] if updated else item})
                 if action == "delete-post":
                     post_id = str(payload.get("postId", ""))
                     post_rows = supabase_request(f"posts?id=eq.{urllib.parse.quote(post_id, safe='')}&select=id,author_id,image_url") or []

@@ -225,7 +225,7 @@ async function loadSpotPosts(spotId) {
     if (result.error) throw new Error(result.error);
     const posts = result.posts || [];
     const viewerId = result.viewerId || '';
-    container.innerHTML = posts.length ? posts.map(post => { const imageUrl=safeImageUrl(post.image_url); const ownPost=viewerId && post.author_id === viewerId; return `<article class="post-card${imageUrl?' has-image':''}"><div class="post-copy"><header><b>${escapeHTML(post.author || '익명 낚시꾼')}</b><span>${post.length ? `${Number(post.length).toFixed(1)}cm${post.length_is_ai ? ' · AI 추정' : ''}` : '일반 후기'}</span></header><p>${escapeHTML(post.content)}</p><footer><span>${post.species ? escapeHTML(post.species) : '조황 정보'} · 추천 ${post.likes || 0}</span><span><button data-like="${post.id}">추천</button> <button class="report-post" data-report-post="${post.id}">신고</button>${ownPost ? ` <button class="delete-post" data-delete-post="${post.id}">삭제</button>` : ''}</span></footer></div>${imageUrl?`<a class="post-thumbnail" href="${escapeHTML(imageUrl)}" target="_blank" rel="noopener"><img src="${escapeHTML(imageUrl)}" alt="게시글 사진" /></a>`:''}</article>`; }).join('') : '<p class="empty-post">아직 게시글이 없습니다. 첫 조황을 남겨보세요.</p>';
+    container.innerHTML = posts.length ? posts.map(post => { const imageUrl=safeImageUrl(post.image_url); const ownPost=viewerId && post.author_id === viewerId; return `<article class="post-card${imageUrl?' has-image':''}"><div class="post-copy"><header><b>${escapeHTML(post.author || '익명 낚시꾼')}</b><span>${post.length ? `${Number(post.length).toFixed(1)}cm${post.length_is_ai ? ' · AI 추정' : ''}` : '일반 후기'}</span></header><p>${escapeHTML(post.content)}</p><footer><span>${post.species ? escapeHTML(post.species) : '조황 정보'} · 추천 ${post.likes || 0}</span><span><button data-like="${post.id}">추천</button> <button class="report-post" data-report-post="${post.id}">신고</button>${ownPost ? ` <button class="edit-post" data-edit-post="${post.id}">수정</button> <button class="delete-post" data-delete-post="${post.id}">삭제</button>` : ''}</span></footer></div>${imageUrl?`<a class="post-thumbnail" href="${escapeHTML(imageUrl)}" target="_blank" rel="noopener"><img src="${escapeHTML(imageUrl)}" alt="게시글 사진" /></a>`:''}</article>`; }).join('') : '<p class="empty-post">아직 게시글이 없습니다. 첫 조황을 남겨보세요.</p>';
     container.querySelectorAll('.post-card header b').forEach((author, index) => {
       const authorId = posts[index]?.author_id;
       if (!authorId) return;
@@ -236,6 +236,10 @@ async function loadSpotPosts(spotId) {
     });
     container.querySelectorAll('[data-like]').forEach(button => button.addEventListener('click', async () => { await fetch('/api/community/like', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:button.dataset.like})}); loadSpotPosts(spotId); }));
     container.querySelectorAll('[data-report-post]').forEach(button => button.addEventListener('click', () => openReport('post', button.dataset.reportPost)));
+    container.querySelectorAll('[data-edit-post]').forEach(button => button.addEventListener('click', () => {
+      const post = posts.find(item => String(item.id) === String(button.dataset.editPost));
+      if (post) openPostEdit(post);
+    }));
     container.querySelectorAll('[data-delete-post]').forEach(button => button.addEventListener('click', async () => {
       if (!window.confirm('내 게시글을 삭제할까요? 삭제한 게시글은 복구할 수 없습니다.')) return;
       const response = await fetch('/api/community/delete-post', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:button.dataset.deletePost})});
@@ -263,6 +267,27 @@ function setupImagePreview(inputId, previewId) {
 }
 setupImagePreview('post-image', 'post-image-selection');
 setupImagePreview('rank-image', 'rank-image-selection');
+setupImagePreview('edit-post-image', 'edit-post-image-selection');
+function openPostEdit(post) {
+  const form = $('#post-edit-form'), preview = $('#edit-post-image-selection'), image = preview.querySelector('img');
+  form.reset(); form.dataset.originalImageUrl = safeImageUrl(post.image_url);
+  form.elements.postId.value = post.id;
+  form.elements.content.value = post.content || '';
+  form.elements.species.value = post.species || '';
+  form.elements.length.value = post.length ?? '';
+  image.src = form.dataset.originalImageUrl;
+  preview.hidden = !form.dataset.originalImageUrl;
+  showFormStatus(form);
+  $('#post-edit-modal').showModal();
+}
+$('#post-edit-form [name="removeImage"]').addEventListener('change', event => {
+  const form = $('#post-edit-form'), preview = $('#edit-post-image-selection'), image = preview.querySelector('img');
+  if (event.currentTarget.checked) { preview.hidden = true; return; }
+  if (!form.elements.image.files?.length && form.dataset.originalImageUrl) { image.src = form.dataset.originalImageUrl; preview.hidden = false; }
+});
+$('#edit-post-image').addEventListener('change', () => {
+  if ($('#edit-post-image').files?.length) $('#post-edit-form [name="removeImage"]').checked = false;
+});
 function showFormStatus(form, message = '', tone = 'error') {
   const status = form.querySelector('.form-status');
   if (!status) return;
@@ -297,6 +322,7 @@ function addFormValidationFeedback(form) {
 
 addFormValidationFeedback($('#post-form'));
 addFormValidationFeedback($('#rank-catch-form'));
+addFormValidationFeedback($('#post-edit-form'));
 
 $('#post-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -313,6 +339,21 @@ $('#post-form').addEventListener('submit', async event => {
     });
   }, '게시글과 조과가 등록되었습니다.', '게시글 저장에 실패했습니다.');
   if (saved) loadSpotPosts(currentSpot.id);
+});
+$('#post-edit-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!signedInUser) { showAuth(); return toast('로그인 후 게시글을 수정할 수 있습니다.'); }
+  const form = event.currentTarget;
+  if (!validateSubmission(form)) return;
+  const data = new FormData(form), length = data.get('length');
+  const saved = await submitOnce(form, $('#post-edit-modal'), async () => {
+    const imageUrl = await uploadPostImage(data.get('image'));
+    return fetch('/api/community/update-post', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({postId:data.get('postId'), content:data.get('content'), species:data.get('species'), length:length ? Number(length) : null, imageUrl, removeImage:data.get('removeImage') === 'on'})
+    });
+  }, '게시글을 수정했습니다.', '게시글 수정에 실패했습니다.');
+  if (saved && currentSpot) { loadSpotPosts(currentSpot.id); loadHeroRanking(); }
 });
 $('#report-form').addEventListener('submit', event => { event.preventDefault(); const form=event.currentTarget,data=new FormData(form); submitOnce(form,$('#report-modal'),()=>fetch('/api/community/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...reportTarget,reason:data.get('reason'),message:data.get('message')})}),'신고가 접수되었습니다.','신고 접수에 실패했습니다.'); });
 $('#inquiry-form').addEventListener('submit', event => { event.preventDefault(); const form=event.currentTarget,data=new FormData(form); submitOnce(form,$('#inquiry-modal'),()=>fetch('/api/community/inquiry',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:data.get('kind'),contact:data.get('contact'),message:data.get('message')})}),'문의가 접수되었습니다.','문의 전송에 실패했습니다.'); });
