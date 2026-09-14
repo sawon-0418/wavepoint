@@ -901,6 +901,9 @@ class Handler(SimpleHTTPRequestHandler):
                     supabase_auth("user", "PUT", update, access_token=verification_token)
                     if nickname:
                         supabase_request(f"profiles?id=eq.{urllib.parse.quote(user['id'], safe='')}", "PATCH", {"display_name": nickname})
+                        # 게시글은 작성 당시의 닉네임도 함께 저장하므로, 프로필 변경 시
+                        # author_id가 같은 과거 게시글·조과의 표시 이름을 모두 갱신한다.
+                        supabase_request(f"posts?author_id=eq.{urllib.parse.quote(user['id'], safe='')}", "PATCH", {"author": nickname}, "return=minimal")
                     self.queue_cookie("wave_account_verification", "", 0)
                     refreshed = user_profile(supabase_auth("user", access_token=verification_token))
                     return self.send_json({"ok": True, "user": refreshed})
