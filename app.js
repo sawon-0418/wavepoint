@@ -537,6 +537,27 @@ function showAuth() {
   if ($('#signup-modal').open) $('#signup-modal').close();
   if (!$('#auth-modal').open) $('#auth-modal').showModal();
 }
+let passwordRecoveryAccessToken = '';
+function showPasswordResetRequest() {
+  if ($('#auth-modal').open) $('#auth-modal').close();
+  const form = $('#password-reset-request-form');
+  form.reset(); showFormStatus(form);
+  if (!$('#password-reset-request-modal').open) $('#password-reset-request-modal').showModal();
+}
+function openPasswordResetFromLink() {
+  const url = new URL(window.location.href);
+  const fragment = new URLSearchParams(url.hash.replace(/^#/, ''));
+  const accessToken = fragment.get('access_token');
+  const recoveryType = fragment.get('type');
+  if (!accessToken || recoveryType !== 'recovery') return;
+  passwordRecoveryAccessToken = accessToken;
+  // 일회성 access token이 주소창·방문 기록에 남지 않도록 즉시 제거한다.
+  url.hash = ''; url.searchParams.delete('reset-password');
+  window.history.replaceState({}, document.title, url.pathname + (url.search || ''));
+  const form = $('#password-reset-form');
+  form.reset(); showFormStatus(form);
+  if (!$('#password-reset-modal').open) $('#password-reset-modal').showModal();
+}
 function showSignup() {
   if ($('#auth-modal').open) $('#auth-modal').close();
   $('#email-confirmation-panel').hidden = true; $('#signup-form').hidden = false;
@@ -577,6 +598,14 @@ $('#open-account-edit').addEventListener('click', () => {
   showFormStatus($('#account-update-form'));
   $('#account-edit-modal').showModal();
 });
+$('#open-account-delete').addEventListener('click', () => {
+  if (!signedInUser) return showAuth();
+  $('#profile-modal').close();
+  const form = $('#account-delete-form');
+  form.reset();
+  showFormStatus(form);
+  $('#account-delete-modal').showModal();
+});
 $('#account-verify-form').addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.currentTarget, button = form.querySelector('button[type="submit"]');
@@ -612,6 +641,23 @@ $('#account-update-form').addEventListener('submit', async event => {
   } catch (error) { showFormStatus(form, error.message || '회원정보를 저장하지 못했습니다.'); toast(error.message || '회원정보를 저장하지 못했습니다.'); }
   finally { button.disabled = false; button.textContent = '변경사항 저장'; }
 });
+$('#account-delete-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget, button = form.querySelector('button[type="submit"]');
+  if (!form.elements.confirmed.checked) return showFormStatus(form, '탈퇴 안내를 확인하고 동의해 주세요.');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = '탈퇴 처리 중…'; showFormStatus(form, '계정과 등록 데이터를 삭제하고 있습니다…', 'pending');
+  try {
+    const response = await fetch('/api/auth/delete-account', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({password:String(form.elements.password.value || '')})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '회원탈퇴를 완료하지 못했습니다.');
+    form.reset(); $('#account-delete-modal').close();
+    applySession(null);
+    await Promise.all([loadCommunitySpots(), loadHeroRanking()]);
+    toast('회원탈퇴가 완료되었습니다. 이용해 주셔서 감사합니다.');
+  } catch (error) { showFormStatus(form, error.message || '회원탈퇴를 완료하지 못했습니다.'); toast(error.message || '회원탈퇴를 완료하지 못했습니다.'); }
+  finally { button.disabled = false; button.textContent = '회원탈퇴 완료'; }
+});
 $('#profile-logout').addEventListener('click', async () => {
   const button = $('#profile-logout');
   if (button.disabled) return;
@@ -625,6 +671,39 @@ $('#profile-logout').addEventListener('click', async () => {
 });
 $('#show-signup').addEventListener('click', showSignup);
 $('#show-signin').addEventListener('click', () => showAuth(false));
+$('#open-password-reset').addEventListener('click', showPasswordResetRequest);
+$('#reset-request-to-signin').addEventListener('click', () => { $('#password-reset-request-modal').close(); showAuth(); });
+$('#password-reset-request-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget, button = form.querySelector('button[type="submit"]');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = '메일 발송 중…'; showFormStatus(form, '재설정 메일을 요청하고 있습니다…', 'pending');
+  try {
+    const response = await fetch('/api/auth/request-password-reset', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:String(form.elements.email.value || '').trim()})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '재설정 메일을 보내지 못했습니다.');
+    showFormStatus(form, '계정이 존재하면 재설정 링크가 이메일로 발송됩니다. 받은메일함과 스팸함을 확인해 주세요.', 'success');
+    toast('재설정 메일을 요청했습니다.');
+  } catch (error) { showFormStatus(form, error.message || '재설정 메일을 보내지 못했습니다.'); toast(error.message || '재설정 메일을 보내지 못했습니다.'); }
+  finally { button.disabled = false; button.textContent = '재설정 메일 보내기'; }
+});
+$('#password-reset-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget, button = form.querySelector('button[type="submit"]');
+  const password = String(form.elements.newPassword.value || ''), confirmation = String(form.elements.newPasswordConfirm.value || '');
+  if (!passwordRecoveryAccessToken) return showFormStatus(form, '재설정 링크가 없거나 만료되었습니다. 비밀번호 찾기부터 다시 진행해 주세요.');
+  if (password !== confirmation) return showFormStatus(form, '새 비밀번호가 서로 일치하지 않습니다.');
+  if (button.disabled) return;
+  button.disabled = true; button.textContent = '저장 중…'; showFormStatus(form, '새 비밀번호를 저장하고 있습니다…', 'pending');
+  try {
+    const response = await fetch('/api/auth/reset-password', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({accessToken:passwordRecoveryAccessToken, newPassword:password})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '새 비밀번호를 저장하지 못했습니다.');
+    passwordRecoveryAccessToken = ''; form.reset(); $('#password-reset-modal').close(); showAuth();
+    toast('새 비밀번호를 저장했습니다. 새 비밀번호로 로그인해 주세요.');
+  } catch (error) { showFormStatus(form, error.message || '새 비밀번호를 저장하지 못했습니다.'); toast(error.message || '새 비밀번호를 저장하지 못했습니다.'); }
+  finally { button.disabled = false; button.textContent = '새 비밀번호 저장'; }
+});
 async function submitAuth(event, action) {
   event.preventDefault();
   const form = event.currentTarget, data = new FormData(form);
@@ -788,3 +867,4 @@ async function loadAdminOverview() {
 }
 $('#admin-refresh').addEventListener('click', loadAdminOverview);
 refreshSession();
+openPasswordResetFromLink();

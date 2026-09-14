@@ -187,6 +187,51 @@ def delete_post_image(image_url):
         if error.code != 404:
             raise RuntimeError(f"게시글 사진을 삭제하지 못했습니다. (HTTP {error.code})") from error
 
+def delete_account_content(user):
+    """회원탈퇴 전에 Auth 사용자에 연결된 서비스 데이터를 정리한다."""
+    user_id = str(user["id"])
+    encoded_user_id = urllib.parse.quote(user_id, safe="")
+    owned_posts = supabase_request(f"posts?author_id=eq.{encoded_user_id}&select=id,image_url") or []
+    owned_spots = supabase_request(f"community_spots?user_id=eq.{encoded_user_id}&select=id") or []
+    post_ids = {str(post.get("id")) for post in owned_posts if post.get("id")}
+    spot_ids = {str(spot.get("id")) for spot in owned_spots if spot.get("id")}
+
+    # 사용자가 공유한 포인트에 연결된 조과는 포인트 삭제 뒤 고아 데이터가 되므로 함께 삭제한다.
+    for spot_id in spot_ids:
+        linked_posts = supabase_request(f"posts?spot_id=eq.{urllib.parse.quote(spot_id, safe='')}&select=id,image_url") or []
+        owned_posts.extend(linked_posts)
+        post_ids.update(str(post.get("id")) for post in linked_posts if post.get("id"))
+    for post in {str(post.get("id")): post for post in owned_posts if post.get("id")}.values():
+        delete_post_image(post.get("image_url"))
+
+    # 대상이 사라지는 신고와 탈퇴자가 제출한 신고·문의는 개인 데이터이므로 함께 제거한다.
+    for post_id in post_ids:
+        encoded_post_id = urllib.parse.quote(post_id, safe="")
+        supabase_request(f"reports?kind=eq.post&target_id=eq.{encoded_post_id}", "DELETE", None, "return=minimal")
+        supabase_request(f"posts?id=eq.{encoded_post_id}", "DELETE", None, "return=minimal")
+    for spot_id in spot_ids:
+        encoded_spot_id = urllib.parse.quote(spot_id, safe="")
+        supabase_request(f"reports?kind=eq.spot&target_id=eq.{encoded_spot_id}", "DELETE", None, "return=minimal")
+        supabase_request(f"community_spots?id=eq.{encoded_spot_id}", "DELETE", None, "return=minimal")
+
+    supabase_request(f"spot_recommendations?user_id=eq.{encoded_user_id}", "DELETE", None, "return=minimal")
+    supabase_request(f"reports?user_id=eq.{encoded_user_id}", "DELETE", None, "return=minimal")
+    supabase_request(f"inquiries?user_id=eq.{encoded_user_id}", "DELETE", None, "return=minimal")
+
+    # 운영자 계정도 탈퇴할 수 있도록 과거 검토·숨김 기록의 작성자 참조는 비운다.
+    supabase_request(f"reports?reviewed_by=eq.{encoded_user_id}", "PATCH", {"reviewed_by": None})
+    supabase_request(f"inquiries?reviewed_by=eq.{encoded_user_id}", "PATCH", {"reviewed_by": None})
+    supabase_request(f"posts?hidden_by=eq.{encoded_user_id}", "PATCH", {"hidden_by": None})
+    supabase_request(f"community_spots?hidden_by=eq.{encoded_user_id}", "PATCH", {"hidden_by": None})
+    supabase_request(f"admin_audit_logs?actor_id=eq.{encoded_user_id}", "DELETE", None, "return=minimal")
+
+    # 탈퇴한 운영자 이메일은 허용 목록에서도 제거해 재가입 시 권한이 자동 복구되지 않게 한다.
+    email = urllib.parse.quote(str(user.get("email") or "").strip().lower(), safe="")
+    if email:
+        supabase_request(f"admin_emails?email=eq.{email}", "DELETE", None, "return=minimal")
+    supabase_auth(f"admin/users/{encoded_user_id}", "DELETE")
+    return {"posts": len(post_ids), "spots": len(spot_ids)}
+
 def upload_post_image(data_url):
     match = re.match(r"^data:(image/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$", data_url or "")
     if not match: raise RuntimeError("JPG, PNG, WEBP 이미지만 업로드할 수 있습니다.")
@@ -588,6 +633,19 @@ class Handler(SimpleHTTPRequestHandler):
         cookie = SimpleCookie(self.headers.get("Cookie", ""))
         return cookie.get("wave_account_verification").value if cookie.get("wave_account_verification") else ""
 
+    def password_reset_redirect_url(self):
+        """Supabase recovery 메일이 돌아올 공개 주소를 만든다.
+
+        배포에서는 PUBLIC_APP_URL을 고정해 두고, 로컬 개발만 현재 요청 주소를
+        사용한다. 링크에는 브라우저에서만 읽는 일회성 recovery 토큰이 붙는다.
+        """
+        configured = os.environ.get("PUBLIC_APP_URL", "").strip().rstrip("/")
+        if configured:
+            return f"{configured}/?reset-password=1"
+        host = self.headers.get("Host", "127.0.0.1:4173").strip()
+        proto = self.headers.get("X-Forwarded-Proto", "").split(",")[0].strip() or "http"
+        return f"{proto}://{host}/?reset-password=1"
+
     def require_user(self):
         user = self.session_user()
         if not user:
@@ -768,6 +826,26 @@ class Handler(SimpleHTTPRequestHandler):
                         return self.send_json({"error": "인증 메일을 받을 이메일을 입력해 주세요."}, 400)
                     supabase_auth("resend", "POST", {"type": "signup", "email": email})
                     return self.send_json({"ok": True})
+                if action == "request-password-reset":
+                    email = str(payload.get("email", "")).strip().lower()
+                    if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email):
+                        return self.send_json({"error": "이메일을 올바르게 입력해 주세요."}, 400)
+                    allowed, retry_after = consume_rate_limit(f"password-reset:{email}", 5, 3600)
+                    if not allowed:
+                        return self.send_json({"error": f"재설정 메일 요청이 너무 많습니다. 약 {retry_after}초 후 다시 시도해 주세요."}, 429, {"Retry-After": str(retry_after)})
+                    # 계정 존재 여부를 알려주지 않아 이메일 주소 추측을 막는다.
+                    supabase_auth("recover", "POST", {"email": email, "redirect_to": self.password_reset_redirect_url()})
+                    return self.send_json({"ok": True})
+                if action == "reset-password":
+                    access_token = str(payload.get("accessToken", "")).strip()
+                    new_password = str(payload.get("newPassword", ""))
+                    if not access_token:
+                        return self.send_json({"error": "비밀번호 재설정 링크가 없거나 만료되었습니다. 다시 요청해 주세요."}, 401)
+                    if len(new_password) < 8:
+                        return self.send_json({"error": "새 비밀번호는 8자 이상 입력해 주세요."}, 400)
+                    # recovery 토큰을 서버에서 검증한 뒤에만 새 비밀번호를 반영한다.
+                    supabase_auth("user", "PUT", {"password": new_password}, access_token=access_token)
+                    return self.send_json({"ok": True})
                 if action == "verify-signup-email":
                     email, token = str(payload.get("email", "")).strip(), str(payload.get("token", "")).strip()
                     if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", email) or not token:
@@ -826,6 +904,22 @@ class Handler(SimpleHTTPRequestHandler):
                     self.queue_cookie("wave_account_verification", "", 0)
                     refreshed = user_profile(supabase_auth("user", access_token=verification_token))
                     return self.send_json({"ok": True, "user": refreshed})
+                if action == "delete-account":
+                    user = self.require_user()
+                    if not user: return
+                    password = str(payload.get("password", ""))
+                    if not password:
+                        return self.send_json({"error": "현재 비밀번호를 입력해 주세요."}, 400)
+                    # 탈퇴 요청마다 현재 비밀번호를 재확인한다. 회원정보 수정용 인증 쿠키만으로는 탈퇴할 수 없다.
+                    verified = supabase_auth("token?grant_type=password", "POST", {"email": user["email"], "password": password})
+                    verified_user = (verified or {}).get("user") or {}
+                    if str(verified_user.get("id") or "") != user["id"]:
+                        return self.send_json({"error": "본인 인증을 확인하지 못했습니다."}, 403)
+                    deleted = delete_account_content(user)
+                    self.clear_session_cookies()
+                    self.queue_cookie("wave_account_verification", "", 0)
+                    self.queue_cookie("wave_signup_verification", "", 0)
+                    return self.send_json({"ok": True, "deleted": deleted})
             except (ValueError, json.JSONDecodeError, RuntimeError) as error:
                 message = str(error)
                 if "email rate limit exceeded" in message.lower():
