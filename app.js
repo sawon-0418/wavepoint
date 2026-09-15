@@ -496,6 +496,7 @@ function updateRankSpotAddress() {
   note.textContent = unavailable ? '주소 미제공 · 지도에서 위치를 확인한 뒤 포인트 정보를 보완해 주세요.' : `주소: ${spot.address}`;
 }
 function openRankCatchModal() {
+  if (!signedInUser) { showAuth(); toast('로그인 후 조과를 등록할 수 있습니다.'); return; }
   fillLoggedInAuthor();
   $('#rank-spot-picker').value = '';
   $('#rank-spot-id').value = '';
@@ -504,6 +505,22 @@ function openRankCatchModal() {
   note.classList.remove('address-unavailable');
   note.textContent = '포인트명이나 지역을 검색한 뒤 목록에서 선택해 주세요.';
   $('#rank-catch-modal').showModal();
+}
+let rankCatchQueryScheduled = false;
+function openRankCatchFromQuery() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('action') !== 'rank-catch') return;
+  // 로그인 전에는 URL을 유지해 로그인 완료 후 동일한 등록 흐름을 이어간다.
+  if (!signedInUser) { showAuth(); return; }
+  if (rankCatchQueryScheduled) return;
+  rankCatchQueryScheduled = true;
+  const openWhenMapReady = () => {
+    if (!map) return setTimeout(openWhenMapReady, 100);
+    url.searchParams.delete('action');
+    window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+    openRankCatchModal();
+  };
+  openWhenMapReady();
 }
 $('#open-rank-catch-modal').addEventListener('click', openRankCatchModal);
 $('#rank-spot-picker').addEventListener('input', updateRankSpotAddress);
@@ -576,6 +593,7 @@ function applySession(user) {
 async function refreshSession() {
   try { const result = await fetch('/api/auth/me').then(response => response.json()); applySession(result.user); }
   catch { applySession(null); }
+  openRankCatchFromQuery();
 }
 function showAuth() {
   if ($('#signup-modal').open) $('#signup-modal').close();
@@ -768,7 +786,7 @@ async function submitAuth(event, action) {
     const sessionResponse = await fetch('/api/auth/me', {credentials: 'same-origin'});
     const session = await sessionResponse.json();
     if (!session.user) return toast('로그인 세션을 저장하지 못했습니다. server.py를 재시작한 뒤 다시 시도해 주세요.');
-    applySession(session.user); $('#auth-modal').close(); form.reset();
+    applySession(session.user); $('#auth-modal').close(); form.reset(); openRankCatchFromQuery();
     toast(action === 'signup' ? '회원가입과 로그인이 완료되었습니다.' : '로그인했습니다.');
   } catch {
     toast('인증 서버에 연결하지 못했습니다. server.py를 재시작하고 Supabase 설정을 확인해 주세요.');

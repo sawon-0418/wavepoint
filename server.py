@@ -668,6 +668,11 @@ def seo_spot_card(spot):
     species = spot.get("species") or "어종 정보 미제공"
     return f'<article class="spot-card"><p>{label} · {html_escape(species)}</p><h2>{html_escape(str(spot.get("title")))}</h2><span>{html_escape(str(address))}</span><a href="{html_escape(urllib.parse.urlsplit(seo_spot_url(spot)).path)}">{html_escape(str(spot.get("title")))} 상세 정보 보기</a></article>'
 
+def seo_image_url(value):
+    """공개 스토리지의 HTTP(S) 이미지 URL만 게시글 목록에 사용한다."""
+    url = str(value or "").strip()
+    return url if re.match(r"^https?://", url, re.IGNORECASE) else ""
+
 def seo_listing_page(path, title, description, heading, spots, intro, crumbs):
     breadcrumb_html, breadcrumb_schema = seo_breadcrumb(crumbs)
     item_list = {"@context": "https://schema.org", "@type": "ItemList", "itemListElement": [
@@ -694,28 +699,39 @@ def seo_detail_page(path, spot):
     body = f'''{breadcrumb_html}<article class="spot-detail-page"><header class="page-heading"><p>{kind} · 낚시 포인트</p><h1>{html_escape(name)}</h1><p>{html_escape(str(spot.get("description") or "등록된 낚시터 정보입니다."))}</p></header><dl class="spot-facts"><div><dt>유형</dt><dd>{kind}</dd></div><div><dt>주소·행정구역</dt><dd>{html_escape(address)}</dd></div><div><dt>주요 어종</dt><dd>{html_escape(str(spot.get("species") or "어종 정보 미제공"))}</dd></div><div><dt>정보 제공</dt><dd>{"공식 낚시터 정보" if spot.get("is_official") else "사용자 공유 포인트"}</dd></div><div><dt>최종 수정일</dt><dd>{html_escape(seo_lastmod(spot.get("updated_at")) or "등록일 정보 미제공")}</dd></div></dl><section><h2>낚시 전 확인하세요</h2><p>금어기, 금지 체장, 보호구역, 출입 통제와 현장 안전 안내는 변동될 수 있습니다. 출조 전 공식 안내와 현장 표지판을 확인해 주세요.</p></section><p><a class="primary-link" href="/?spot={urllib.parse.quote(str(spot.get("id")), safe="")}">물결포인트 지도에서 위치 보기</a></p></article>'''
     return seo_document(f"{name} 낚시 포인트｜어종·조과 정보 – 물결포인트", description, path, body, [breadcrumb_schema, place])
 
-def seo_catch_page(posts):
+def seo_catch_page(posts, spots):
     path = "/posts"
     title = "낚시 게시글｜조과와 낚시 후기 – 물결포인트"
     description = "물결포인트 이용자가 공개한 낚시 게시글, 조과와 낚시 후기를 최신순으로 확인하세요."
     breadcrumbs, breadcrumb_schema = seo_breadcrumb([("홈", "/"), ("낚시 게시글", path)])
-    cards = "".join(f'<article class="catch-card"><h2>{html_escape(str(post.get("species") or "낚시 게시글"))}{f" · {float(post.get("length")):.1f}cm" if post.get("length") else ""}</h2><p>{html_escape(str(post.get("content") or ""))}</p><span>{html_escape(str(post.get("author") or "낚시꾼"))} · 등록일 {html_escape(seo_lastmod(post.get("created_at")) or "정보 미제공")}</span></article>' for post in posts[:100]) or '<p class="empty-state">아직 공개된 게시글이 없습니다.</p>'
+    spots_by_id = {str(spot.get("id")): spot for spot in spots}
+    cards = []
+    for post in posts[:100]:
+        spot = spots_by_id.get(str(post.get("spot_id")))
+        species = str(post.get("species") or "낚시 게시글")
+        try: length = f" · {float(post.get('length')):.1f}cm" if post.get("length") else ""
+        except (TypeError, ValueError): length = ""
+        image_url = seo_image_url(post.get("image_url"))
+        photo = f'<img class="catch-thumbnail" src="{html_escape(image_url, quote=True)}" alt="{html_escape(species)} 낚시 게시글 사진" width="144" height="144" loading="lazy">' if image_url else ""
+        spot_link = f'<a class="catch-spot-link" href="{html_escape(urllib.parse.urlsplit(seo_spot_url(spot)).path)}">{html_escape(str(spot.get("title")))} 포인트 보기</a>' if spot else '<span class="catch-spot-missing">연결된 포인트 정보가 없습니다.</span>'
+        cards.append(f'<article class="catch-card{" has-image" if photo else ""}"><div class="catch-card-body"><h2>{html_escape(species)}{length}</h2><p>{html_escape(str(post.get("content") or ""))}</p><span>{html_escape(str(post.get("author") or "낚시꾼"))} · 등록일 {html_escape(seo_lastmod(post.get("created_at")) or "정보 미제공")}</span>{spot_link}</div>{photo}</article>')
+    cards_html = "".join(cards) or '<p class="empty-state">아직 공개된 게시글이 없습니다.</p>'
     collection = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "낚시 게시글", "url": f"{public_site_url()}{path}", "description": description}
-    body = f'{breadcrumbs}<header class="page-heading"><p>FISHING POSTS</p><h1>낚시 게시글</h1><p>이용자가 공개한 조과와 낚시 후기를 최신순으로 확인합니다.</p></header><section class="catch-grid">{cards}</section>'
+    body = f'{breadcrumbs}<header class="page-heading"><p>FISHING POSTS</p><h1>낚시 게시글</h1><p>이용자가 공개한 조과와 낚시 후기를 최신순으로 확인합니다.</p><a class="primary-link" href="/?action=rank-catch">포인트를 선택해 조과 등록하기</a></header><section class="catch-grid">{cards_html}</section>'
     return seo_document(title, description, path, body, [breadcrumb_schema, collection])
 
 def seo_guides_page(path):
     title = "낚시 가이드｜안전수칙과 출조 전 확인사항 – 물결포인트"
     description = "안전한 낚시를 위해 금어기, 금지 체장, 기상과 출입 통제를 확인하는 방법을 안내합니다."
     crumbs, crumb_schema = seo_breadcrumb([("홈", "/"), ("낚시 가이드", path)])
-    body = f'{crumbs}<header class="page-heading"><p>FISHING GUIDE</p><h1>낚시 가이드</h1><p>출조 전 확인해야 할 안전수칙과 현지 규정 안내입니다.</p></header><section class="guide-list"><article><h2>안전한 낚시를 위한 기본 확인사항</h2><p>구명조끼, 기상과 파고, 출입 통제, 야간 안전, 쓰레기 회수와 현지 규정을 확인하세요.</p><a href="/guides/safe-fishing-basics">낚시 안전수칙 자세히 보기</a></article></section>'
+    body = f'{crumbs}<header class="page-heading"><p>FISHING GUIDE</p><h1>낚시 가이드</h1><p>출조 전 확인해야 할 안전수칙과 현지 규정 안내입니다.</p></header><section class="guide-list"><article><h2>안전한 낚시를 위한 기본 확인사항</h2><p>구명조끼, 기상과 파도, 출입 통제, 야간 안전, 쓰레기 회수와 현지 규정을 확인하세요.</p><a href="/guides/safe-fishing-basics">낚시 안전수칙 자세히 보기</a></article></section>'
     return seo_document(title, description, path, body, [crumb_schema, {"@context":"https://schema.org","@type":"CollectionPage","name":"물결포인트 낚시 가이드","url":f"{public_site_url()}{path}"}])
 
 def seo_guide_article(path):
     title = "안전한 낚시를 위한 출조 전 확인사항 – 물결포인트 낚시 가이드"
-    description = "구명조끼, 기상과 파고, 출입 통제, 금어기와 금지 체장을 출조 전 확인하세요."
+    description = "구명조끼, 기상과 파도, 출입 통제, 금어기와 금지 체장을 출조 전 확인하세요."
     crumbs, crumb_schema = seo_breadcrumb([("홈", "/"), ("낚시 가이드", "/guides"), ("안전수칙", path)])
-    body = f'{crumbs}<article class="guide-article"><header class="page-heading"><p>SAFETY GUIDE</p><h1>안전한 낚시를 위한 출조 전 확인사항</h1><p>{html_escape(description)}</p></header><h2>현장 안전</h2><ul><li>구명조끼를 착용하고 기상·파고 예보를 확인하세요.</li><li>출입 통제, 사유지, 항만과 보호구역 안내를 준수하세요.</li><li>야간 낚시에는 조명과 동행 여부를 점검하고 쓰레기를 되가져오세요.</li></ul><h2>낚시 규정</h2><p>금어기와 금지 체장은 어종·해역·지자체 고시에 따라 달라질 수 있습니다. 물결포인트 정보는 참고용이며, 출조 전 최신 공식 기준과 현장 표지판을 확인해야 합니다.</p></article>'
+    body = f'{crumbs}<article class="guide-article"><header class="page-heading"><p>SAFETY GUIDE</p><h1>안전한 낚시를 위한 출조 전 확인사항</h1><p>{html_escape(description)}</p></header><h2>현장 안전</h2><ul><li>구명조끼를 착용하고 기상·파도 예보를 확인하세요.</li><li>출입 통제, 사유지, 항만과 보호구역 안내를 준수하세요.</li><li>야간 낚시에는 조명과 동행 여부를 점검하고 쓰레기를 되가져오세요.</li></ul><h2>낚시 규정</h2><p>금어기와 금지 체장은 어종·해역·지자체 고시에 따라 달라질 수 있습니다. 물결포인트 정보는 참고용이며, 출조 전 최신 공식 기준과 현장 표지판을 확인해야 합니다.</p></article>'
     article = {"@context":"https://schema.org","@type":"Article","headline":"안전한 낚시를 위한 출조 전 확인사항","description":description,"inLanguage":"ko-KR","mainEntityOfPage":f"{public_site_url()}{path}","publisher":{"@type":"Organization","name":"물결포인트","url":public_site_url()}}
     return seo_document(title, description, path, body, [crumb_schema, article])
 
@@ -849,7 +865,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def seo_posts(self):
         try:
-            posts = supabase_request("posts?is_hidden=is.false&select=id,spot_id,author,content,species,length,created_at&order=created_at.desc&limit=200") or []
+            posts = supabase_request("posts?is_hidden=is.false&select=id,spot_id,author,content,species,length,image_url,created_at&order=created_at.desc&limit=200") or []
             hidden = supabase_request("community_spots?is_hidden=is.true&select=id") or []
             hidden_ids = {str(item.get("id")) for item in hidden}
             return [post for post in posts if str(post.get("spot_id")) not in hidden_ids]
@@ -905,7 +921,7 @@ class Handler(SimpleHTTPRequestHandler):
             spot = next((item for item in records if seo_short_id(item.get("id")) == token), None)
             if not spot: return self.send_seo_not_found()
             return self.send_html(seo_detail_page(path, spot))
-        if path == "/posts": return self.send_html(seo_catch_page(self.seo_posts()))
+        if path == "/posts": return self.send_html(seo_catch_page(self.seo_posts(), records))
         if path == "/guides": return self.send_html(seo_guides_page(path))
         if path == "/guides/safe-fishing-basics": return self.send_html(seo_guide_article(path))
         return self.send_seo_not_found()
