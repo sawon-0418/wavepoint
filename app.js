@@ -69,28 +69,8 @@ function switchTab(id){
 document.querySelectorAll('nav [data-tab]').forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
 document.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.closeModal).close()));
 
-const seasonalRules = {
-  sea: [
-    { label: '꽃게', size: '금지체장 6.4cm', closed: ['06-21', '08-20'] },
-    { label: '고등어', size: '금지체장 21cm', closed: ['04-01', '06-30'] },
-    { label: '광어', size: '금지체장 35cm', closed: null },
-    { label: '우럭', size: '금지체장 23cm', closed: null }
-  ],
-  river: [
-    { label: '쏘가리', size: '금지체장 18cm', closed: ['05-01', '06-30'] },
-    { label: '배스', size: '지역별 방류 제한 확인', closed: null },
-    { label: '붕어', size: '지역별 기준 확인', closed: null }
-  ]
-};
-const restrictedZones = [
-  { name: '청평호 수질보호 구역', points: [[37.735,127.405],[37.735,127.440],[37.705,127.440],[37.705,127.405]] },
-  { name: '을왕리 항만 안전 구역', points: [[37.460,126.350],[37.460,126.385],[37.435,126.385],[37.435,126.350]] },
-  { name: '대부도 양식장 보호 구역', points: [[37.205,126.620],[37.205,126.665],[37.170,126.665],[37.170,126.620]] }
-];
-function dateInRange(range) { if(!range) return false; const now = new Date(); const current = (now.getMonth()+1)*100 + now.getDate(); const [start,end] = range.map(value => { const [m,d]=value.split('-').map(Number); return m*100+d; }); return start <= end ? current >= start && current <= end : current >= start || current <= end; }
 function showSpotDetail(spot) {
   currentSpot = spot;
-  const rules = seasonalRules[spot.kind] || [];
   $('#detail-title').textContent = spot.title;
   $('#detail-description').textContent = spot.description;
   const ownerCard = $('#detail-owner-card');
@@ -109,8 +89,6 @@ function showSpotDetail(spot) {
   addressButton.classList.toggle('address-unavailable', hasUnavailableAddress(spot));
   addressButton.dataset.lat = spot.lat;
   addressButton.dataset.lng = spot.lng;
-  $('#detail-region').textContent = `${spot.kind === 'sea' ? '해양' : '내수면'} · 등록 어종: ${spot.species}`;
-  $('#detail-regulations').innerHTML = rules.map(rule => `<div class="regulation-row"><b>${rule.label}</b><span>${rule.size}${rule.closed ? ` · ${dateInRange(rule.closed) ? '<strong style="color:#c9473e">현재 금어기</strong>' : `금어기 ${rule.closed[0]}~${rule.closed[1]}`}` : ''}</span></div>`).join('');
   $('#spot-detail-modal').showModal();
   // 추천 정보 로딩에 문제가 생겨도 포인트 상세 화면 자체는 반드시 열려야 한다.
   try { renderSpotRecommendation(spot); } catch { /* 추천 UI는 다음 새로고침에 복구한다. */ }
@@ -140,7 +118,7 @@ $('#recommend-spot-button').addEventListener('click', async () => {
   } catch (error) { toast(error.message || '포인트 추천에 실패했습니다.'); }
   finally { button.disabled = false; }
 });
-function displayProtectedAreas(geojson) { if(!map)return; const legend=$('#protected-legend'); protectedLayers.forEach(layer=>layer.setMap(null)); protectedLayers=[]; const addPolygon=(paths,name)=>{const layer=new naver.maps.Polygon({map,paths,zIndex:1,strokeColor:'#c94239',strokeWeight:1.5,strokeStyle:'shortdash',fillColor:'#e04f45',fillOpacity:.26}); naver.maps.Event.addListener(layer,'click',()=>toast(`⚠ ${name||'수산자원보호구역'}`)); protectedLayers.push(layer);}; if(!geojson.features?.length) { if(legend)legend.innerHTML='<span></span> 포획·출입 제한 구역 (예시)'; restrictedZones.forEach(zone=>addPolygon(zone.points.map(([lat,lng])=>new naver.maps.LatLng(lat,lng)),`예시 · ${zone.name}`)); return; } if(legend)legend.innerHTML='<span></span> 수산자원보호구역 (공식 WFS)'; geojson.features.forEach(feature=>{const geometry=feature.geometry||{};const name=feature.properties?.name||feature.properties?.NAME||'수산자원보호구역';const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.type==='MultiPolygon'?geometry.coordinates:[];polygons.forEach(polygon=>addPolygon(polygon[0].map(([lng,lat])=>new naver.maps.LatLng(lat,lng)),name));}); }
+function displayProtectedAreas(geojson) { if(!map)return; const legend=$('#protected-legend'); protectedLayers.forEach(layer=>layer.setMap(null)); protectedLayers=[]; const addPolygon=(paths,name)=>{const layer=new naver.maps.Polygon({map,paths,zIndex:1,strokeColor:'#c94239',strokeWeight:1.5,strokeStyle:'shortdash',fillColor:'#e04f45',fillOpacity:.26}); naver.maps.Event.addListener(layer,'click',()=>toast(`⚠ ${name||'수산자원보호구역'}`)); protectedLayers.push(layer);}; if(!geojson.features?.length) { if(legend)legend.hidden=true; return; } if(legend){legend.hidden=false;legend.innerHTML='<span></span> 수산자원보호구역 (공식 WFS)';} geojson.features.forEach(feature=>{const geometry=feature.geometry||{};const name=feature.properties?.name||feature.properties?.NAME||'수산자원보호구역';const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.type==='MultiPolygon'?geometry.coordinates:[];polygons.forEach(polygon=>addPolygon(polygon[0].map(([lng,lat])=>new naver.maps.LatLng(lat,lng)),name));}); }
 async function enrichOfficialAddresses(){ const targets=spots.filter(spot=>isOfficialSpot(spot)&&spot.address==='공식 API 등록 포인트'); if(!targets.length)return; try { toast(`주소가 비어 있는 ${targets.length}개 포인트를 보완하고 있어요.`); const result=await fetch('/api/address-enrichment',{method:'POST'}).then(response=>response.json()); const refreshed=await fetch('/api/spots').then(response=>response.json()); const officialById=new Map((refreshed.items||[]).map(spot=>[String(spot.id),spot])); spots.forEach((spot,index)=>{const newer=officialById.get(String(spot.id));if(newer)spots[index]={...spot,...newer,source:'official'};}); renderSpots(); const reason=Array.isArray(result.errors)&&result.errors[0]; toast(result.updated?`${result.updated}개 포인트의 주소를 네이버 지도로 보완했어요.`:reason||'주소 보완 결과가 없습니다. 네이버 API 설정을 확인해주세요.'); } catch { toast('서버의 네이버 주소 보완을 시작하지 못했습니다. 서버를 다시 실행한 뒤 재시도해주세요.'); } }
 async function loadOfficialData() { try { const [spotsResponse, areasResponse] = await Promise.all([fetch('/api/spots'), fetch('/api/protected-areas')]); const official = await spotsResponse.json(); const areas = await areasResponse.json(); const known = new Set(spots.map(spot => `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`)); (official.items || []).forEach(spot => { const index = spots.findIndex(existing => String(existing.id) === String(spot.id)); const key = `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`; if(index >= 0) spots[index] = {...spots[index],...spot,source:'official'}; else if(!known.has(key)) spots.push({...spot,source:'official'}); }); renderSpots(); const requestedSpotId = new URLSearchParams(window.location.search).get('spot'); const requestedSpot = requestedSpotId && spots.find(spot => String(spot.id) === requestedSpotId); if (requestedSpot) { focusSpotOnMap(requestedSpot, 15, false); showSpotDetail(requestedSpot); } displayProtectedAreas(areas); await loadSpotRecommendations(); await enrichOfficialAddresses(); } catch { displayProtectedAreas({features:[]}); loadSpotRecommendations(); } }
 // 등록용 지도 안에서 장소를 찾고, 검색 결과는 이 지도만 이동시킨다.
@@ -226,7 +204,9 @@ async function loadSpotPosts(spotId) {
     if (result.error) throw new Error(result.error);
     const posts = result.posts || [];
     const viewerId = result.viewerId || '';
-    container.innerHTML = posts.length ? posts.map(post => { const imageUrl=safeImageUrl(post.image_url); const ownPost=viewerId && post.author_id === viewerId; return `<article class="post-card${imageUrl?' has-image':''}"><div class="post-copy"><header><b>${escapeHTML(post.author || '익명 낚시꾼')}</b><span>${post.length ? `${Number(post.length).toFixed(1)}cm${post.length_is_ai ? ' · AI 추정' : ''}` : '일반 후기'}</span></header><p>${escapeHTML(post.content)}</p><footer><span>${post.species ? escapeHTML(post.species) : '조황 정보'} · 추천 ${post.likes || 0}</span><span><button data-like="${post.id}">추천</button> <button class="report-post" data-report-post="${post.id}">신고</button>${ownPost ? ` <button class="edit-post" data-edit-post="${post.id}">수정</button> <button class="delete-post" data-delete-post="${post.id}">삭제</button>` : ''}</span></footer></div>${imageUrl?`<a class="post-thumbnail" href="${escapeHTML(imageUrl)}" target="_blank" rel="noopener"><img src="${escapeHTML(imageUrl)}" alt="게시글 사진" /></a>`:''}</article>`; }).join('') : '<p class="empty-post">아직 게시글이 없습니다. 첫 조황을 남겨보세요.</p>';
+    const recommendationCounts = result.recommendationCounts || {};
+    const recommendedPostIds = new Set((result.recommendedPostIds || []).map(String));
+    container.innerHTML = posts.length ? posts.map(post => { const imageUrl=safeImageUrl(post.image_url); const ownPost=viewerId && post.author_id === viewerId; const recommended=recommendedPostIds.has(String(post.id)); const recommendationCount=Number(recommendationCounts[String(post.id)] || 0); return `<article class="post-card${imageUrl?' has-image':''}"><div class="post-copy"><header><b>${escapeHTML(post.author || '익명 낚시꾼')}</b><span>${post.length ? `${Number(post.length).toFixed(1)}cm${post.length_is_ai ? ' · AI 추정' : ''}` : '일반 후기'}</span></header><p>${escapeHTML(post.content)}</p><footer><span>${post.species ? escapeHTML(post.species) : '조황 정보'} · 추천 ${recommendationCount}</span><span><button data-recommend-post="${post.id}" aria-pressed="${recommended}">${recommended ? '♥ 추천했어요' : '♡ 추천'}</button> <button class="report-post" data-report-post="${post.id}">신고</button>${ownPost ? ` <button class="edit-post" data-edit-post="${post.id}">수정</button> <button class="delete-post" data-delete-post="${post.id}">삭제</button>` : ''}</span></footer></div>${imageUrl?`<a class="post-thumbnail" href="${escapeHTML(imageUrl)}" target="_blank" rel="noopener"><img src="${escapeHTML(imageUrl)}" alt="게시글 사진" /></a>`:''}</article>`; }).join('') : '<p class="empty-post">아직 게시글이 없습니다. 첫 조황을 남겨보세요.</p>';
     container.querySelectorAll('.post-card header b').forEach((author, index) => {
       const authorId = posts[index]?.author_id;
       if (!authorId) return;
@@ -235,7 +215,21 @@ async function loadSpotPosts(spotId) {
       author.addEventListener('click', openProfile);
       author.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openProfile(); } });
     });
-    container.querySelectorAll('[data-like]').forEach(button => button.addEventListener('click', async () => { await fetch('/api/community/like', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:button.dataset.like})}); loadSpotPosts(spotId); }));
+    container.querySelectorAll('[data-recommend-post]').forEach(button => button.addEventListener('click', async () => {
+      if (!signedInUser) { showAuth(); return toast('로그인 후 게시글을 추천할 수 있습니다.'); }
+      if (button.disabled) return;
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/community/recommend-post', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({postId:button.dataset.recommendPost})});
+        if (!response.ok) throw new Error(await apiError(response, '게시글 추천에 실패했습니다.'));
+        const saved = await response.json();
+        toast(saved.recommended ? '게시글을 추천했습니다.' : '게시글 추천을 취소했습니다.');
+        loadSpotPosts(spotId);
+      } catch (error) {
+        button.disabled = false;
+        toast(error.message || '게시글 추천에 실패했습니다.');
+      }
+    }));
     container.querySelectorAll('[data-report-post]').forEach(button => button.addEventListener('click', () => openReport('post', button.dataset.reportPost)));
     container.querySelectorAll('[data-edit-post]').forEach(button => button.addEventListener('click', () => {
       const post = posts.find(item => String(item.id) === String(button.dataset.editPost));
@@ -869,10 +863,10 @@ $('#resend-confirmation').addEventListener('click', async event => {
 });
 document.querySelectorAll('[data-open-policy]').forEach(button => button.addEventListener('click', () => $(`#${button.dataset.openPolicy}`).showModal()));
 document.addEventListener('click', event => {
-  const protectedAction = event.target.closest('#open-spot-modal,#open-rank-catch-modal,#new-post-button,#open-inquiry-modal,#report-spot-button,[data-report-post],[data-like]');
+  const protectedAction = event.target.closest('#open-spot-modal,#open-rank-catch-modal,#new-post-button,#open-inquiry-modal,#report-spot-button,[data-report-post],[data-recommend-post]');
   if (protectedAction && !signedInUser) {
     event.preventDefault(); event.stopImmediatePropagation(); showAuth();
-    const actionLabel = protectedAction.matches('[data-like]') ? '추천' : protectedAction.matches('#open-inquiry-modal') ? '문의' : protectedAction.matches('#report-spot-button,[data-report-post]') ? '신고' : '등록';
+    const actionLabel = protectedAction.matches('[data-recommend-post]') ? '추천' : protectedAction.matches('#open-inquiry-modal') ? '문의' : protectedAction.matches('#report-spot-button,[data-report-post]') ? '신고' : '등록';
     toast(`로그인 후 ${actionLabel}할 수 있습니다.`);
   }
 }, true);

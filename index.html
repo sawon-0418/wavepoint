@@ -97,10 +97,8 @@
         <section id="detail-owner-card" class="spot-owner-card" hidden><div><small>사용자 공유 포인트</small><b id="detail-owner-name">공유자</b></div><button id="detail-owner-profile" class="outline-button" type="button">공유자 조과 보기</button></section>
         <button id="detail-address" class="address-button" type="button"></button>
         <button id="recommend-spot-button" class="spot-recommend-button" type="button" hidden>♡ 이 포인트 추천하기 <span id="detail-recommend-count">0</span></button>
-        <section class="regulation-card"><div class="regulation-heading"><span>◉</span><div><b>현재 낚시 규정</b><small id="detail-region"></small></div></div><div id="detail-regulations" class="regulation-list"></div></section>
         <section class="community-card"><div class="community-heading"><div><b>게시글 · 조과</b><small>인기순 · 길이 경쟁</small></div><button id="new-post-button" class="primary-button" type="button">글 작성</button></div><div id="spot-posts" class="spot-posts"></div></section>
         <div class="detail-actions"><button id="report-spot-button" class="text-button" type="button">낚시터 정보 신고</button></div>
-        <p class="legal-note">규정은 어종·해역·지자체 고시에 따라 달라질 수 있습니다. 출조 전 해양수산부 및 현장 안내판의 최신 기준을 확인하세요.</p>
       </div>
     </dialog>
     <dialog id="post-modal" class="modal"><form id="post-form" novalidate><div class="modal-header"><div><p class="eyebrow">CATCH POST</p><h2>게시글 · 조과 등록</h2></div><button class="close" type="button" data-close-modal="post-modal">×</button></div><label>작성자 <span class="optional">로그인 닉네임</span><input name="author" maxlength="24" readonly /></label><label>내용<textarea required name="content" maxlength="800" placeholder="조황, 팁, 주의사항을 남겨주세요."></textarea></label><label>사진 <span class="optional">선택 · JPG/PNG/WEBP, 50MB 이하</span><input id="post-image" name="image" type="file" accept="image/jpeg,image/png,image/webp" /></label><div id="post-image-selection" class="image-selection" hidden><img alt="선택한 게시글 사진 미리보기" /><button type="button" data-reselect-image="post-image">다른 사진 선택</button></div><label>어종 <input name="species" maxlength="30" placeholder="예: 우럭" /></label><label>길이(cm) <span class="optional">선택</span><input name="length" type="number" min="1" max="300" step="0.1" placeholder="사진 AI 추정은 추후 연동" /></label><p class="form-status" aria-live="polite" hidden></p><button class="primary-button" type="submit">게시하기</button></form></dialog>
@@ -127,7 +125,7 @@
         <div id="region-spot-list" class="region-spot-list"></div>
       </div>
     </dialog>
-            <div class="restricted-legend" id="protected-legend"><span></span> 포획·출입 제한 구역</div>
+            <div class="restricted-legend" id="protected-legend" hidden><span></span> 수산자원보호구역 (공식 WFS)</div>
 <footer class="legal-footer"><a href="#top">서비스 소개</a><a href="/posts">낚시 게시글</a><a href="/guides">낚시 안전수칙</a><button data-open-policy="privacy-modal" type="button">개인정보처리방침</button><button data-open-policy="terms-modal" type="button">이용약관</button><button data-open-policy="location-modal" type="button">위치정보 안내</button><button id="footer-inquiry-link" type="button">문의하기</button><span>신고된 게시글·사진은 검토 후 숨김 또는 삭제될 수 있습니다.</span></footer>
     <button id="open-inquiry-modal" class="inquiry-fab" type="button">문의 · 정보 제보</button><div id="toast" class="toast" role="status"></div>
     <script src="app.js?v=20260911-separated-region-clusters"></script>
