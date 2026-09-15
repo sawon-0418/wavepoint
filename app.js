@@ -57,6 +57,8 @@ async function init(){
   preview($('#catch-image'),$('#catch-preview'));
   $('#catch-form').addEventListener('submit',event=>{ event.preventDefault(); const data=new FormData(event.target), input=data.get('length'), ai=!input, length=ai?Number((28+(data.get('species').length*3.7)+Math.random()*18).toFixed(1)):Number(input); catches.push({name:'박낚시꾼',species:data.get('species'),length,color:'blue',ai}); save(); renderRanking(); event.target.reset(); $('#catch-preview').hidden=true; $('#catch-modal').close(); toast(ai?`AI가 ${length}cm로 추정해 랭킹에 등록했어요.`:`${length}cm 조과를 랭킹에 등록했어요!`); });
   await loadOfficialData();
+  // /posts의 조과 등록 진입은 지도와 포인트 선택 목록이 준비된 뒤에 연다.
+  openRankCatchFromQuery();
 }
 
 function switchTab(id){
