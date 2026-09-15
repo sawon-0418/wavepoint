@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <meta name="theme-color" content="#102a32" />
+    <title>운영자 관리 – 물결포인트</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/overrides.css" />
+  </head>
+  <body>
+    <header class="topbar"><a class="brand" href="/"><span class="brand-mark">≋</span>물결포인트</a><nav aria-label="운영자 메뉴"><a href="/">공개 사이트</a></nav></header>
+    <main class="admin-section">
+      <div class="section-heading"><div><p class="eyebrow">ADMIN CHANNEL</p><h1>운영자 관리</h1></div><button id="admin-refresh" class="outline-button" type="button">새로고침</button></div>
+      <p id="admin-status" class="account-help">운영 정보를 불러오는 중입니다.</p>
+      <div class="admin-summary"><div><b id="admin-member-count">–</b><span>인증 완료 회원</span></div><div><b id="admin-report-count">–</b><span>미처리 신고</span></div><div><b id="admin-inquiry-count">–</b><span>미처리 문의</span></div><div><b id="admin-spot-count">–</b><span>사용자 포인트</span></div></div>
+      <div class="admin-grid"><section><h2>신고 관리</h2><div id="admin-reports" class="admin-list"></div></section><section><h2>문의 · 정보 제보</h2><div id="admin-inquiries" class="admin-list"></div></section><section><h2>사용자 공유 포인트</h2><div id="admin-spots" class="admin-list"></div></section><section class="admin-audit-card"><h2>최근 운영 기록</h2><div id="admin-audits" class="admin-list"></div></section></div>
+    </main>
+    <script src="/admin.js"></script>
+  </body>
+</html>
