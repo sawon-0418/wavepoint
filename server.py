@@ -1067,10 +1067,16 @@ class Handler(SimpleHTTPRequestHandler):
                     posts = [post for post in posts if str(post.get("spot_id")) not in hidden_spot_ids]
                 post_ids = [str(post.get("id")) for post in (posts or []) if post.get("id")]
                 recommendations = []
+                recommendations_available = True
                 if post_ids:
                     encoded_ids = ",".join(urllib.parse.quote(post_id, safe="") for post_id in post_ids)
-                    recommendations = supabase_request(f"post_recommendations?post_id=in.({encoded_ids})&select=post_id,user_id") or []
-                counts = {}
+                    try:
+                        recommendations = supabase_request(f"post_recommendations?post_id=in.({encoded_ids})&select=post_id,user_id") or []
+                    except RuntimeError:
+                        # 추천 테이블이 아직 배포되지 않았거나 일시적으로 조회되지 않아도
+                        # 핵심 게시글·조과 목록은 정상적으로 보여준다.
+                        recommendations_available = False
+                counts = {str(post.get("id")): int(post.get("likes") or 0) for post in (posts or []) if post.get("id")}
                 recommended_post_ids = []
                 viewer_id = str(viewer.get("id") or "") if viewer else ""
                 for recommendation in recommendations:
@@ -1080,7 +1086,7 @@ class Handler(SimpleHTTPRequestHandler):
                     counts[post_id] = counts.get(post_id, 0) + 1
                     if viewer_id and str(recommendation.get("user_id") or "") == viewer_id:
                         recommended_post_ids.append(post_id)
-                return self.send_json({"posts": posts or [], "viewerId": viewer.get("id") if viewer else None, "recommendationCounts": counts, "recommendedPostIds": recommended_post_ids})
+                return self.send_json({"posts": posts or [], "viewerId": viewer.get("id") if viewer else None, "recommendationCounts": counts, "recommendedPostIds": recommended_post_ids, "postRecommendationsAvailable": recommendations_available})
             except RuntimeError as error:
                 return self.send_json({"posts": [], "error": str(error)}, 503)
         return super().do_GET()

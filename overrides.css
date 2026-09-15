@@ -1,8 +1,7 @@
 header.topbar nav { gap: 17px; }
-header.topbar nav a { position:relative; display:inline-flex; align-items:center; min-height:38px; padding:8px 12px; border:1px solid #d6dfd8; border-radius:6px; background:#fffdf8; color:#52666a; white-space:nowrap; transition:background-color .18s,border-color .18s,color .18s; }
+header.topbar nav a { position:relative; display:inline-flex; align-items:center; min-height:38px; padding:8px 4px; color:#52666a; white-space:nowrap; transition:color .18s; }
 header.topbar nav a + a::before { content:"|"; position:absolute; left:-11px; top:50%; color:#c5cdca; font-weight:400; transform:translateY(-52%); pointer-events:none; }
-header.topbar nav a:hover,header.topbar nav a:focus-visible { border-color:#8ebbb0; background:#edf6f0; color:#007d79; }
-header.topbar nav a.active { border-color:#b7d9cc; background:#dfeee5; color:#007d79; }
+header.topbar nav a:hover,header.topbar nav a:focus-visible,header.topbar nav a.active { color:#007d79; }
 .tab-panel[hidden] { display: none; }
 .restricted-legend { position: fixed; right: 20px; bottom: 18px; z-index: 900; background: #fffdf8; border: 1px solid #e7c5c1; box-shadow: 0 2px 10px #0002; padding: 8px 11px; font-size: 11px; color: #74413c; }
 .restricted-legend span { display: inline-block; width: 10px; height: 10px; margin-right: 5px; background: #df4e43; opacity: .7; }
@@ -33,7 +32,7 @@ header.topbar nav a.active { border-color:#b7d9cc; background:#dfeee5; color:#00
 
 @media (max-width: 760px) {
   header.topbar nav { display: flex; margin-left: auto; margin-right: 12px; gap: 12px; }
-  header.topbar nav a { min-height:34px; padding:6px 7px; font-size:11px; }
+  header.topbar nav a { min-height:34px; padding:6px 2px; font-size:11px; }
   header.topbar nav a + a::before { left:-8px; }
   .restricted-legend { right: 10px; bottom: 10px; font-size: 10px; }
   .hero-ranking { width:100%; margin-top:25px; }
