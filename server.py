@@ -217,6 +217,7 @@ def delete_account_content(user):
         supabase_request(f"community_spots?id=eq.{encoded_spot_id}", "DELETE", None, "return=minimal")
 
     supabase_request(f"spot_recommendations?user_id=eq.{encoded_user_id}", "DELETE", None, "return=minimal")
+    supabase_request(f"post_recommendations?user_id=eq.{encoded_user_id}", "DELETE", None, "return=minimal")
     supabase_request(f"reports?user_id=eq.{encoded_user_id}", "DELETE", None, "return=minimal")
     supabase_request(f"inquiries?user_id=eq.{encoded_user_id}", "DELETE", None, "return=minimal")
 
@@ -651,7 +652,7 @@ def seo_document(title, description, canonical_path, body, schemas, robots="inde
 <meta name="google-site-verification" content="{google_verification}"><meta name="naver-site-verification" content="{naver_verification}"><title>{html_escape(title)}</title><meta name="description" content="{html_escape(description)}"><meta name="robots" content="{robots}"><meta name="googlebot" content="{robots}"><meta name="theme-color" content="#008b87"><link rel="canonical" href="{html_escape(canonical)}"><link rel="icon" type="image/png" href="/og-image.png"><link rel="apple-touch-icon" href="/og-image.png">
 <meta property="og:locale" content="ko_KR"><meta property="og:type" content="website"><meta property="og:site_name" content="물결포인트"><meta property="og:title" content="{html_escape(title)}"><meta property="og:description" content="{html_escape(description)}"><meta property="og:url" content="{html_escape(canonical)}"><meta property="og:image" content="{site}/og-image.png"><meta property="og:image:alt" content="물결포인트 낚시 포인트 지도"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="{html_escape(title)}"><meta name="twitter:description" content="{html_escape(description)}"><meta name="twitter:image" content="{site}/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/seo-pages.css">{json_ld}</head>
-<body><header class="seo-header"><a class="seo-brand" href="/"><span>≋</span> 물결포인트</a><nav aria-label="주요 메뉴"><a href="/">낚시 포인트 지도</a><a href="/posts">낚시 게시글</a><a href="/guides">낚시 가이드</a></nav></header><main class="seo-main">{body}</main><footer class="seo-footer"><a href="/">낚시 포인트 지도</a><a href="/posts">낚시 게시글</a><a href="/guides/safe-fishing-basics">낚시 안전수칙</a><a href="/sitemap.xml">사이트맵</a><span>출조 전 현지 규정과 안전 안내를 최신 기준으로 확인하세요.</span></footer></body></html>'''
+<body><header class="seo-header"><a class="seo-brand" href="/"><span>≋</span> 물결포인트</a><nav aria-label="주요 메뉴"><a href="/">낚시 포인트 찾기</a><a href="/posts">게시글</a><a href="/guides">안전 수칙</a></nav></header><main class="seo-main">{body}</main><footer class="seo-footer"><a href="/">낚시 포인트 지도</a><a href="/posts">낚시 게시글</a><a href="/guides/safe-fishing-basics">낚시 안전수칙</a><a href="/sitemap.xml">사이트맵</a><span>출조 전 현지 규정과 안전 안내를 최신 기준으로 확인하세요.</span></footer></body></html>'''
 
 def seo_breadcrumb(items):
     site = public_site_url()
@@ -1064,7 +1065,22 @@ class Handler(SimpleHTTPRequestHandler):
                     hidden_spot_rows = supabase_request("community_spots?is_hidden=is.true&select=id") or []
                     hidden_spot_ids = {str(row.get("id")) for row in hidden_spot_rows}
                     posts = [post for post in posts if str(post.get("spot_id")) not in hidden_spot_ids]
-                return self.send_json({"posts": posts or [], "viewerId": viewer.get("id") if viewer else None})
+                post_ids = [str(post.get("id")) for post in (posts or []) if post.get("id")]
+                recommendations = []
+                if post_ids:
+                    encoded_ids = ",".join(urllib.parse.quote(post_id, safe="") for post_id in post_ids)
+                    recommendations = supabase_request(f"post_recommendations?post_id=in.({encoded_ids})&select=post_id,user_id") or []
+                counts = {}
+                recommended_post_ids = []
+                viewer_id = str(viewer.get("id") or "") if viewer else ""
+                for recommendation in recommendations:
+                    post_id = str(recommendation.get("post_id") or "")
+                    if not post_id:
+                        continue
+                    counts[post_id] = counts.get(post_id, 0) + 1
+                    if viewer_id and str(recommendation.get("user_id") or "") == viewer_id:
+                        recommended_post_ids.append(post_id)
+                return self.send_json({"posts": posts or [], "viewerId": viewer.get("id") if viewer else None, "recommendationCounts": counts, "recommendedPostIds": recommended_post_ids})
             except RuntimeError as error:
                 return self.send_json({"posts": [], "error": str(error)}, 503)
         return super().do_GET()
@@ -1354,9 +1370,26 @@ class Handler(SimpleHTTPRequestHandler):
                     if not item["message"]: return self.send_json({"error": "내용을 입력해주세요."}, 400)
                     supabase_request(table, "POST", item)
                     return self.send_json({"ok": True}, 201)
-                if action == "like":
-                    result = supabase_request("rpc/increment_post_like", "POST", {"post_id": str(payload.get("postId", ""))})
-                    return self.send_json({"likes": result})
+                if action == "recommend-post":
+                    if not self.require_rate_limit(user, "recommend-post", 100, 3600): return
+                    try:
+                        post_id = str(uuid.UUID(str(payload.get("postId", ""))))
+                    except (ValueError, AttributeError):
+                        return self.send_json({"error": "추천할 게시글을 찾지 못했습니다."}, 400)
+                    encoded_post_id = urllib.parse.quote(post_id, safe="")
+                    post_rows = supabase_request(f"posts?id=eq.{encoded_post_id}&is_hidden=is.false&select=id") or []
+                    if not post_rows:
+                        return self.send_json({"error": "추천할 수 없는 게시글입니다."}, 404)
+                    encoded_user_id = urllib.parse.quote(user["id"], safe="")
+                    existing = supabase_request(f"post_recommendations?post_id=eq.{encoded_post_id}&user_id=eq.{encoded_user_id}&select=id") or []
+                    if existing:
+                        supabase_request(f"post_recommendations?id=eq.{urllib.parse.quote(str(existing[0]['id']), safe='')}", "DELETE", None, "return=minimal")
+                        recommended = False
+                    else:
+                        supabase_request("post_recommendations", "POST", {"post_id": post_id, "user_id": user["id"]})
+                        recommended = True
+                    count = len(supabase_request(f"post_recommendations?post_id=eq.{encoded_post_id}&select=id") or [])
+                    return self.send_json({"recommended": recommended, "count": count})
                 if action == "recommend-spot":
                     if not self.require_rate_limit(user, "recommend-spot", 100, 3600): return
                     spot_id = str(payload.get("spotId", ""))[:120]

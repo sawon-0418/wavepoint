@@ -41,6 +41,15 @@ create table if not exists public.spot_recommendations (
   created_at timestamptz not null default now(),
   unique (spot_id, user_id)
 );
+-- 게시글 추천도 계정당 게시글 하나에 하나만 활성화한다.
+-- 행 자체를 추천 상태로 사용하므로 같은 계정이 여러 번 눌러도 추천 수가 중복되지 않는다.
+create table if not exists public.post_recommendations (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references public.posts(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (post_id, user_id)
+);
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text not null default '낚시꾼',
@@ -92,25 +101,24 @@ create index if not exists reports_status_idx on public.reports (status, created
 create index if not exists inquiries_status_idx on public.inquiries (status, created_at desc);
 create index if not exists community_spots_visibility_idx on public.community_spots (is_hidden, created_at desc);
 create index if not exists spot_recommendations_spot_idx on public.spot_recommendations (spot_id, created_at desc);
+create index if not exists post_recommendations_post_idx on public.post_recommendations (post_id, created_at desc);
 alter table public.posts enable row level security;
 alter table public.reports enable row level security;
 alter table public.inquiries enable row level security;
 alter table public.community_spots enable row level security;
 alter table public.spot_recommendations enable row level security;
+alter table public.post_recommendations enable row level security;
 alter table public.official_spots enable row level security;
 alter table public.protected_areas enable row level security;
 alter table public.sync_runs enable row level security;
 alter table public.profiles enable row level security;
 alter table public.admin_emails enable row level security;
 alter table public.admin_audit_logs enable row level security;
-create or replace function public.increment_post_like(post_id uuid) returns integer language plpgsql security definer set search_path = public as $$
-declare updated_likes integer; begin update posts set likes = likes + 1 where id = post_id returning likes into updated_likes; return updated_likes; end; $$;
-revoke all on public.posts, public.reports, public.inquiries, public.community_spots, public.spot_recommendations, public.official_spots, public.protected_areas, public.sync_runs, public.profiles from anon, authenticated;
+drop function if exists public.increment_post_like(uuid);
+revoke all on public.posts, public.reports, public.inquiries, public.community_spots, public.spot_recommendations, public.post_recommendations, public.official_spots, public.protected_areas, public.sync_runs, public.profiles from anon, authenticated;
 revoke all on public.admin_audit_logs from anon, authenticated;
-revoke all on function public.increment_post_like(uuid) from public;
 -- Data API 자동 공개를 끈 경우에도, 서버의 Service Role에는 필요한 권한을 명시한다.
-grant select, insert, update, delete on public.posts, public.reports, public.inquiries, public.community_spots, public.spot_recommendations, public.official_spots, public.protected_areas, public.sync_runs to service_role;
-grant execute on function public.increment_post_like(uuid) to service_role;
+grant select, insert, update, delete on public.posts, public.reports, public.inquiries, public.community_spots, public.spot_recommendations, public.post_recommendations, public.official_spots, public.protected_areas, public.sync_runs to service_role;
 grant select, insert, update, delete on public.profiles to service_role;
 grant select, insert, update, delete on public.admin_emails to service_role;
 grant select, insert, update, delete on public.admin_audit_logs to service_role;
