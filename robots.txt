@@ -1,4 +1,10 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /login
+Disallow: /signup
+Disallow: /account/
+Disallow: /settings/
 
 Sitemap: https://wavepoint-aghq.onrender.com/sitemap.xml

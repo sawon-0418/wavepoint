@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import base64
+import hashlib
 import hmac
 import os
 import re
@@ -16,6 +17,7 @@ import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 from http.cookies import SimpleCookie
+from html import escape as html_escape
 from datetime import datetime, timedelta, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -569,6 +571,158 @@ def scheduled_sync():
         result = sync_all()
         print(f"[{datetime.now(kst).isoformat(timespec='seconds')}] sync: {result}")
 
+# 공개 SEO 페이지는 JavaScript 실행을 기다리지 않고 서버가 완성된 HTML로 반환한다.
+# 지도 본문과 별개로 공개 상태의 공식·사용자 포인트만 사용하며, 운영 데이터는 포함하지 않는다.
+SEO_REGIONS = {
+    "seoul": ("서울", ("서울",)), "busan": ("부산", ("부산",)),
+    "daegu": ("대구", ("대구",)), "incheon": ("인천", ("인천",)),
+    "gwangju": ("광주", ("광주",)), "daejeon": ("대전", ("대전",)),
+    "ulsan": ("울산", ("울산",)), "sejong": ("세종", ("세종",)),
+    "gyeonggi": ("경기도", ("경기",)), "gangwon": ("강원", ("강원",)),
+    "north-chungcheong": ("충청북도", ("충북", "충청북도")),
+    "south-chungcheong": ("충청남도", ("충남", "충청남도")),
+    "north-jeolla": ("전북", ("전북", "전라북도", "전북특별자치도")),
+    "south-jeolla": ("전남", ("전남", "전라남도")),
+    "north-gyeongsang": ("경북", ("경북", "경상북도")),
+    "south-gyeongsang": ("경남", ("경남", "경상남도")),
+    "jeju": ("제주", ("제주",)), "geoje": ("거제", ("거제",)),
+    "gangneung": ("강릉", ("강릉",)),
+}
+SEO_FISH = {
+    "black-sea-bream": "감성돔", "rockfish": "우럭", "flounder": "광어", "bass": "배스", "cuttlefish": "갑오징어",
+}
+
+def public_site_url():
+    return os.environ.get("PUBLIC_APP_URL", "https://wavepoint-aghq.onrender.com").strip().rstrip("/")
+
+def seo_slug(value):
+    slug = re.sub(r"[^0-9A-Za-z가-힣]+", "-", str(value or "").strip().lower()).strip("-")
+    return slug[:72] or "spot"
+
+def seo_short_id(value):
+    return hashlib.sha1(str(value).encode("utf-8")).hexdigest()[:10]
+
+def seo_spot_url(spot):
+    return f"{public_site_url()}/spot/{seo_slug(spot.get('title'))}-{seo_short_id(spot.get('id'))}"
+
+def seo_lastmod(value):
+    if not value: return None
+    try: return str(value)[:10] if re.match(r"^\d{4}-\d{2}-\d{2}", str(value)) else None
+    except (TypeError, ValueError): return None
+
+def seo_public_spots():
+    """검색에 공개해도 되는 포인트만 반환한다. DB가 일시적으로 실패하면 공식 캐시만 쓴다."""
+    try:
+        official = supabase_request("official_spots?select=id,title,kind,lat,lng,species,description,address,source,updated_at&order=title.asc&limit=2000") or []
+    except RuntimeError:
+        official = read_json("official_spots.json", {"items": []}).get("items", [])
+    try:
+        community = supabase_request("community_spots?is_hidden=is.false&select=id,title,kind,lat,lng,species,description,address,created_at&order=created_at.desc&limit=1000") or []
+    except RuntimeError:
+        community = []
+    records, seen = [], set()
+    for source_name, bucket in (("official", official), ("community", community)):
+        for raw in bucket:
+            spot_id = str(raw.get("id") or "")
+            if not spot_id or spot_id in seen or not raw.get("title"): continue
+            seen.add(spot_id)
+            item = dict(raw)
+            item["id"] = spot_id
+            item["kind"] = "sea" if item.get("kind") == "sea" else "river"
+            item["updated_at"] = item.get("updated_at") or item.get("created_at")
+            item["is_official"] = source_name == "official"
+            records.append(item)
+    return records
+
+def seo_region_of(spot):
+    source = f"{spot.get('address') or ''} {spot.get('description') or ''}"
+    for slug, (label, matchers) in SEO_REGIONS.items():
+        if any(matcher in source or matcher in str(spot.get("title") or "") for matcher in matchers):
+            return slug, label
+    return None, None
+
+def seo_json(data):
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+
+def seo_document(title, description, canonical_path, body, schemas, robots="index,follow"):
+    site = public_site_url()
+    canonical = f"{site}{canonical_path}"
+    json_ld = "\n".join(f'<script type="application/ld+json">{seo_json(schema)}</script>' for schema in schemas)
+    google_verification = html_escape(os.environ.get("GOOGLE_SITE_VERIFICATION", ""), quote=True)
+    naver_verification = html_escape(os.environ.get("NAVER_SITE_VERIFICATION", ""), quote=True)
+    return f'''<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="{google_verification}"><meta name="naver-site-verification" content="{naver_verification}"><title>{html_escape(title)}</title><meta name="description" content="{html_escape(description)}"><meta name="robots" content="{robots}"><meta name="googlebot" content="{robots}"><meta name="theme-color" content="#008b87"><link rel="canonical" href="{html_escape(canonical)}"><link rel="icon" type="image/png" href="/og-image.png"><link rel="apple-touch-icon" href="/og-image.png">
+<meta property="og:locale" content="ko_KR"><meta property="og:type" content="website"><meta property="og:site_name" content="물결포인트"><meta property="og:title" content="{html_escape(title)}"><meta property="og:description" content="{html_escape(description)}"><meta property="og:url" content="{html_escape(canonical)}"><meta property="og:image" content="{site}/og-image.png"><meta property="og:image:alt" content="물결포인트 낚시 포인트 지도"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="{html_escape(title)}"><meta name="twitter:description" content="{html_escape(description)}"><meta name="twitter:image" content="{site}/og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/seo-pages.css">{json_ld}</head>
+<body><header class="seo-header"><a class="seo-brand" href="/"><span>≋</span> 물결포인트</a><nav aria-label="주요 메뉴"><a href="/spots">낚시 포인트 찾기</a><a href="/spots/type/sea">바다낚시 포인트</a><a href="/spots/type/freshwater">민물낚시 포인트</a><a href="/catch-reports">최근 조과</a><a href="/guides">낚시 가이드</a></nav></header><main class="seo-main">{body}</main><footer class="seo-footer"><a href="/">낚시 포인트 지도</a><a href="/spots">지역별 낚시터</a><a href="/guides/safe-fishing-basics">낚시 안전수칙</a><a href="/sitemap.xml">사이트맵</a><span>출조 전 현지 규정과 안전 안내를 최신 기준으로 확인하세요.</span></footer></body></html>'''
+
+def seo_breadcrumb(items):
+    site = public_site_url()
+    schema = {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
+        {"@type": "ListItem", "position": position, "name": name, "item": f"{site}{path}"}
+        for position, (name, path) in enumerate(items, 1)
+    ]}
+    links = " <span aria-hidden=\"true\">/</span> ".join(f'<a href="{html_escape(path)}">{html_escape(name)}</a>' for name, path in items)
+    return f'<nav class="breadcrumbs" aria-label="현재 위치">{links}</nav>', schema
+
+def seo_spot_card(spot):
+    label = "바다낚시" if spot.get("kind") == "sea" else "민물낚시"
+    address = spot.get("address") or "주소 정보 미제공"
+    species = spot.get("species") or "어종 정보 미제공"
+    return f'<article class="spot-card"><p>{label} · {html_escape(species)}</p><h2>{html_escape(str(spot.get("title")))}</h2><span>{html_escape(str(address))}</span><a href="{html_escape(urllib.parse.urlsplit(seo_spot_url(spot)).path)}">{html_escape(str(spot.get("title")))} 상세 정보 보기</a></article>'
+
+def seo_listing_page(path, title, description, heading, spots, intro, crumbs):
+    breadcrumb_html, breadcrumb_schema = seo_breadcrumb(crumbs)
+    item_list = {"@context": "https://schema.org", "@type": "ItemList", "itemListElement": [
+        {"@type": "ListItem", "position": index, "name": str(spot.get("title")), "url": seo_spot_url(spot)}
+        for index, spot in enumerate(spots[:100], 1)
+    ]}
+    collection = {"@context": "https://schema.org", "@type": "CollectionPage", "name": heading, "url": f"{public_site_url()}{path}", "description": description}
+    cards = "".join(seo_spot_card(spot) for spot in spots[:100]) or '<p class="empty-state">아직 공개된 낚시터 정보가 없습니다.</p>'
+    body = f'{breadcrumb_html}<header class="page-heading"><p>FISHING SPOTS</p><h1>{html_escape(heading)}</h1><p>{html_escape(intro)}</p><strong>공개 낚시터 {len(spots)}곳</strong></header><section class="spot-grid" aria-label="낚시터 목록">{cards}</section>'
+    return seo_document(title, description, path, body, [breadcrumb_schema, collection, item_list])
+
+def seo_detail_page(path, spot):
+    kind = "바다낚시" if spot.get("kind") == "sea" else "민물낚시"
+    name = str(spot.get("title"))
+    address = str(spot.get("address") or "주소 정보 미제공")
+    description = f"{name} 낚시 포인트의 {kind} 유형, 대상 어종과 이용자 조과 정보를 확인하세요."
+    crumbs = [("홈", "/"), ("낚시 포인트", "/spots"), (name, path)]
+    breadcrumb_html, breadcrumb_schema = seo_breadcrumb(crumbs)
+    place = {"@context": "https://schema.org", "@type": "Place", "name": name, "url": f"{public_site_url()}{path}", "description": str(spot.get("description") or description)}
+    if address != "주소 정보 미제공": place["address"] = address
+    # 사용자 공유 포인트는 생태·안전상 정확한 좌표를 구조화 데이터에 싣지 않는다.
+    if spot.get("is_official") and spot.get("lat") is not None and spot.get("lng") is not None:
+        place["geo"] = {"@type": "GeoCoordinates", "latitude": spot["lat"], "longitude": spot["lng"]}
+    body = f'''{breadcrumb_html}<article class="spot-detail-page"><header class="page-heading"><p>{kind} · 낚시 포인트</p><h1>{html_escape(name)}</h1><p>{html_escape(str(spot.get("description") or "등록된 낚시터 정보입니다."))}</p></header><dl class="spot-facts"><div><dt>유형</dt><dd>{kind}</dd></div><div><dt>주소·행정구역</dt><dd>{html_escape(address)}</dd></div><div><dt>주요 어종</dt><dd>{html_escape(str(spot.get("species") or "어종 정보 미제공"))}</dd></div><div><dt>정보 제공</dt><dd>{"공식 낚시터 정보" if spot.get("is_official") else "사용자 공유 포인트"}</dd></div><div><dt>최종 수정일</dt><dd>{html_escape(seo_lastmod(spot.get("updated_at")) or "등록일 정보 미제공")}</dd></div></dl><section><h2>낚시 전 확인하세요</h2><p>금어기, 금지 체장, 보호구역, 출입 통제와 현장 안전 안내는 변동될 수 있습니다. 출조 전 공식 안내와 현장 표지판을 확인해 주세요.</p></section><p><a class="primary-link" href="/?spot={urllib.parse.quote(str(spot.get("id")), safe="")}">물결포인트 지도에서 위치 보기</a></p></article>'''
+    return seo_document(f"{name} 낚시 포인트｜어종·조과 정보 – 물결포인트", description, path, body, [breadcrumb_schema, place])
+
+def seo_catch_page(posts):
+    path = "/catch-reports"
+    title = "최근 등록된 낚시 조과｜낚시 후기 – 물결포인트"
+    description = "물결포인트에 공개된 최신 낚시 조과와 낚시 후기를 확인하세요."
+    breadcrumbs, breadcrumb_schema = seo_breadcrumb([("홈", "/"), ("최근 조과", path)])
+    cards = "".join(f'<article class="catch-card"><h2>{html_escape(str(post.get("species") or "낚시 조과"))}{f" · {float(post.get("length")):.1f}cm" if post.get("length") else ""}</h2><p>{html_escape(str(post.get("content") or ""))}</p><span>등록일 {html_escape(seo_lastmod(post.get("created_at")) or "정보 미제공")}</span></article>' for post in posts[:100]) or '<p class="empty-state">아직 공개된 조과가 없습니다.</p>'
+    collection = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "최근 등록된 낚시 조과", "url": f"{public_site_url()}{path}", "description": description}
+    body = f'{breadcrumbs}<header class="page-heading"><p>RECENT CATCHES</p><h1>최근 등록된 낚시 조과</h1><p>이용자가 공개한 조과와 낚시 후기를 최신순으로 확인합니다.</p></header><section class="catch-grid">{cards}</section>'
+    return seo_document(title, description, path, body, [breadcrumb_schema, collection])
+
+def seo_guides_page(path):
+    title = "낚시 가이드｜안전수칙과 출조 전 확인사항 – 물결포인트"
+    description = "안전한 낚시를 위해 금어기, 금지 체장, 기상과 출입 통제를 확인하는 방법을 안내합니다."
+    crumbs, crumb_schema = seo_breadcrumb([("홈", "/"), ("낚시 가이드", path)])
+    body = f'{crumbs}<header class="page-heading"><p>FISHING GUIDE</p><h1>낚시 가이드</h1><p>출조 전 확인해야 할 안전수칙과 현지 규정 안내입니다.</p></header><section class="guide-list"><article><h2>안전한 낚시를 위한 기본 확인사항</h2><p>구명조끼, 기상과 파고, 출입 통제, 야간 안전, 쓰레기 회수와 현지 규정을 확인하세요.</p><a href="/guides/safe-fishing-basics">낚시 안전수칙 자세히 보기</a></article></section>'
+    return seo_document(title, description, path, body, [crumb_schema, {"@context":"https://schema.org","@type":"CollectionPage","name":"물결포인트 낚시 가이드","url":f"{public_site_url()}{path}"}])
+
+def seo_guide_article(path):
+    title = "안전한 낚시를 위한 출조 전 확인사항 – 물결포인트 낚시 가이드"
+    description = "구명조끼, 기상과 파고, 출입 통제, 금어기와 금지 체장을 출조 전 확인하세요."
+    crumbs, crumb_schema = seo_breadcrumb([("홈", "/"), ("낚시 가이드", "/guides"), ("안전수칙", path)])
+    body = f'{crumbs}<article class="guide-article"><header class="page-heading"><p>SAFETY GUIDE</p><h1>안전한 낚시를 위한 출조 전 확인사항</h1><p>{html_escape(description)}</p></header><h2>현장 안전</h2><ul><li>구명조끼를 착용하고 기상·파고 예보를 확인하세요.</li><li>출입 통제, 사유지, 항만과 보호구역 안내를 준수하세요.</li><li>야간 낚시에는 조명과 동행 여부를 점검하고 쓰레기를 되가져오세요.</li></ul><h2>낚시 규정</h2><p>금어기와 금지 체장은 어종·해역·지자체 고시에 따라 달라질 수 있습니다. 물결포인트 정보는 참고용이며, 출조 전 최신 공식 기준과 현장 표지판을 확인해야 합니다.</p></article>'
+    article = {"@context":"https://schema.org","@type":"Article","headline":"안전한 낚시를 위한 출조 전 확인사항","description":description,"inLanguage":"ko-KR","mainEntityOfPage":f"{public_site_url()}{path}","publisher":{"@type":"Organization","name":"물결포인트","url":public_site_url()}}
+    return seo_document(title, description, path, body, [crumb_schema, article])
+
 class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         # 정적 파일과 API 응답 모두에 적용되는 기본 브라우저 보안 정책이다.
@@ -576,6 +730,9 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
+        static_path = urllib.parse.urlsplit(self.path).path
+        if static_path.endswith((".css", ".js", ".png", ".svg", ".webp", ".woff2")):
+            self.send_header("Cache-Control", "public, max-age=604800")
         super().end_headers()
 
     def cookie_suffix(self, max_age):
@@ -674,7 +831,119 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_json({"error": f"요청이 너무 많습니다. 약 {retry_after}초 후 다시 시도해 주세요."}, 429, {"Retry-After": str(retry_after)})
         return False
 
+    def send_html(self, html, status=200, robots=None):
+        raw = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store" if robots and "noindex" in robots else "public, max-age=300")
+        if robots: self.send_header("X-Robots-Tag", robots)
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def send_xml(self, xml):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/xml; charset=utf-8")
+        self.send_header("Cache-Control", "public, max-age=300")
+        self.end_headers()
+        self.wfile.write(xml.encode("utf-8"))
+
+    def send_seo_not_found(self):
+        body = '<main class="seo-main"><h1>페이지를 찾을 수 없습니다</h1><p>요청한 낚시 포인트 또는 가이드는 없거나 더 이상 공개되지 않습니다.</p><p><a href="/spots">낚시 포인트 목록으로 돌아가기</a></p></main>'
+        self.send_html(seo_document("페이지를 찾을 수 없습니다 – 물결포인트", "요청한 페이지를 찾을 수 없습니다.", self.path.split("?", 1)[0], body, [], "noindex,nofollow"), 404, "noindex,nofollow")
+
+    def seo_posts(self):
+        try:
+            posts = supabase_request("posts?is_hidden=is.false&select=id,spot_id,content,species,length,created_at&order=created_at.desc&limit=200") or []
+            hidden = supabase_request("community_spots?is_hidden=is.true&select=id") or []
+            hidden_ids = {str(item.get("id")) for item in hidden}
+            return [post for post in posts if str(post.get("spot_id")) not in hidden_ids]
+        except RuntimeError:
+            return []
+
+    def serve_main_page(self):
+        content = (ROOT / "index.html").read_text(encoding="utf-8")
+        replacements = {
+            "{{SITE_URL}}": public_site_url(), "{{CANONICAL_URL}}": f"{public_site_url()}/",
+            "{{GOOGLE_SITE_VERIFICATION}}": os.environ.get("GOOGLE_SITE_VERIFICATION", ""),
+            "{{NAVER_SITE_VERIFICATION}}": os.environ.get("NAVER_SITE_VERIFICATION", ""),
+        }
+        for marker, value in replacements.items(): content = content.replace(marker, html_escape(value, quote=True))
+        self.send_html(content)
+
+    def serve_sitemap(self):
+        site, records = public_site_url(), seo_public_spots()
+        posts = self.seo_posts()
+        urls = [("/", None), ("/spots", None), ("/spots/type/sea", None), ("/spots/type/freshwater", None), ("/guides", None), ("/guides/safe-fishing-basics", None)]
+        if posts: urls.append(("/catch-reports", max((seo_lastmod(post.get("created_at")) or "" for post in posts), default=None)))
+        for slug, (_, matchers) in SEO_REGIONS.items():
+            regional = [spot for spot in records if any(matcher in f"{spot.get('title') or ''} {spot.get('address') or ''} {spot.get('description') or ''}" for matcher in matchers)]
+            if regional: urls.append((f"/spots/{slug}", max((seo_lastmod(spot.get("updated_at")) or "" for spot in regional), default=None)))
+        for slug, fish in SEO_FISH.items():
+            fish_spots = [spot for spot in records if fish in str(spot.get("species") or "")]
+            if fish_spots: urls.append((f"/fish/{slug}", max((seo_lastmod(spot.get("updated_at")) or "" for spot in fish_spots), default=None)))
+        urls.extend((urllib.parse.urlsplit(seo_spot_url(spot)).path, seo_lastmod(spot.get("updated_at"))) for spot in records)
+        # 동일한 URL은 한 번만 내보낸다. 업데이트 시각이 있는 쪽을 우선한다.
+        unique = {}
+        for path, lastmod in urls:
+            if path not in unique or (lastmod and (not unique[path] or lastmod > unique[path])):
+                unique[path] = lastmod
+        entries = []
+        for path, lastmod in unique.items():
+            entries.append(f"<url><loc>{html_escape(site + path)}</loc>{f'<lastmod>{lastmod}</lastmod>' if lastmod else ''}</url>")
+        self.send_xml('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + "".join(entries) + "</urlset>")
+
+    def serve_public_seo_page(self, path):
+        records = seo_public_spots()
+        if path == "/spots":
+            return self.send_html(seo_listing_page(path, "전국 낚시 포인트 추천｜낚시터 지도·조과 – 물결포인트", "전국 바다·민물 낚시 포인트와 지역별 낚시터 정보를 확인하세요.", "전국 낚시 포인트 추천", records, "공개된 공식 낚시터와 사용자 공유 포인트를 유형과 지역별로 확인할 수 있습니다.", [("홈", "/"), ("낚시 포인트", path)]))
+        if path in ("/spots/type/sea", "/spots/type/freshwater"):
+            sea = path.endswith("sea")
+            selected = [spot for spot in records if (spot.get("kind") == "sea") == sea]
+            label = "바다낚시" if sea else "민물낚시"
+            return self.send_html(seo_listing_page(path, f"{label} 포인트 추천｜지역별 낚시터 – 물결포인트", f"전국 {label} 포인트와 낚시터 정보를 확인하세요.", f"전국 {label} 포인트", selected, f"공개된 {label} 포인트 {len(selected)}곳을 확인할 수 있습니다.", [("홈", "/"), ("낚시 포인트", "/spots"), (f"{label} 포인트", path)]))
+        if path.startswith("/spots/"):
+            slug = path.rsplit("/", 1)[-1]
+            if slug not in SEO_REGIONS: return self.send_seo_not_found()
+            label, matchers = SEO_REGIONS[slug]
+            selected = [spot for spot in records if any(matcher in f"{spot.get('title') or ''} {spot.get('address') or ''} {spot.get('description') or ''}" for matcher in matchers)]
+            return self.send_html(seo_listing_page(path, f"{label} 낚시 포인트 추천｜낚시터 지도·조과 – 물결포인트", f"{label} 낚시 포인트와 공개 낚시터 정보를 확인하세요.", f"{label} 낚시 포인트 추천", selected, f"{label} 지역으로 분류된 공개 낚시터와 낚시 포인트 목록입니다.", [("홈", "/"), ("낚시 포인트", "/spots"), (f"{label} 낚시 포인트", path)]))
+        if path.startswith("/fish/"):
+            slug = path.rsplit("/", 1)[-1]
+            fish = SEO_FISH.get(slug)
+            if not fish: return self.send_seo_not_found()
+            selected = [spot for spot in records if fish in str(spot.get("species") or "")]
+            return self.send_html(seo_listing_page(path, f"{fish} 낚시 포인트 추천｜지역별 낚시터 – 물결포인트", f"{fish} 낚시 포인트와 관련 낚시터 정보를 확인하세요.", f"{fish} 낚시 포인트", selected, f"등록된 정보 중 {fish} 어종과 연결된 공개 낚시 포인트 목록입니다.", [("홈", "/"), ("낚시 포인트", "/spots"), (f"{fish} 낚시 포인트", path)]))
+        if path.startswith("/spot/"):
+            token = path.rsplit("-", 1)[-1]
+            spot = next((item for item in records if seo_short_id(item.get("id")) == token), None)
+            if not spot: return self.send_seo_not_found()
+            return self.send_html(seo_detail_page(path, spot))
+        if path == "/catch-reports": return self.send_html(seo_catch_page(self.seo_posts()))
+        if path == "/guides": return self.send_html(seo_guides_page(path))
+        if path == "/guides/safe-fishing-basics": return self.send_html(seo_guide_article(path))
+        return self.send_seo_not_found()
+
     def do_GET(self):
+        path = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path)
+        # 공개 첫 화면과 검색 엔진용 공개 페이지는 서버에서 완성된 HTML을 반환한다.
+        # 인증·운영 API는 아래 기존 경로에서만 처리한다.
+        if path in ("/", "/index.html"):
+            return self.serve_main_page()
+        if path == "/robots.txt":
+            site = public_site_url()
+            robots = f"User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /api/\nDisallow: /login\nDisallow: /signup\nDisallow: /account/\nDisallow: /settings/\n\nSitemap: {site}/sitemap.xml\n"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.end_headers()
+            return self.wfile.write(robots.encode("utf-8"))
+        if path == "/sitemap.xml":
+            return self.serve_sitemap()
+        if path in ("/admin", "/admin/", "/admin.html"):
+            if not self.require_admin(): return
+            return self.send_html((ROOT / "admin.html").read_text(encoding="utf-8"), robots="noindex,nofollow,noarchive")
+        if path in ("/spots", "/spots/type/sea", "/spots/type/freshwater", "/catch-reports", "/guides", "/guides/safe-fishing-basics") or path.startswith(("/spots/", "/fish/", "/spot/")):
+            return self.serve_public_seo_page(path)
         # 배포 상태 확인용 경량 엔드포인트. 인증·외부 API·DB 조회를 하지 않는다.
         if self.path == "/api/health":
             return self.send_json({"ok": True})

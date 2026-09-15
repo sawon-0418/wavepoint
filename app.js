@@ -55,7 +55,6 @@ async function init(){
   $('#open-spot-modal').addEventListener('click',()=>{ selectedLatLng=null; const center=map.getCenter(); $('#selected-location').textContent='현재 지도 중심 위치에 포인트가 등록됩니다.'; $('#spot-modal').showModal(); setSpotAddress(center.lat(),center.lng()); });
   $('#open-catch-modal').addEventListener('click',()=>$('#catch-modal').showModal());
   preview($('#catch-image'),$('#catch-preview'));
-  $('#spot-form').addEventListener('submit',event=>{ event.preventDefault(); const data=new FormData(event.target), center=selectedLatLng||map.getCenter(); spots.unshift({id:Date.now(),title:data.get('title'),kind:data.get('kind'),description:data.get('description'),species:'새 포인트',lat:center.lat(),lng:center.lng()}); save(); renderSpots(); event.target.reset(); $('#spot-modal').close(); toast('새 낚시 포인트를 공유했어요!'); });
   $('#catch-form').addEventListener('submit',event=>{ event.preventDefault(); const data=new FormData(event.target), input=data.get('length'), ai=!input, length=ai?Number((28+(data.get('species').length*3.7)+Math.random()*18).toFixed(1)):Number(input); catches.push({name:'박낚시꾼',species:data.get('species'),length,color:'blue',ai}); save(); renderRanking(); event.target.reset(); $('#catch-preview').hidden=true; $('#catch-modal').close(); toast(ai?`AI가 ${length}cm로 추정해 랭킹에 등록했어요.`:`${length}cm 조과를 랭킹에 등록했어요!`); });
   await loadOfficialData();
 }
@@ -141,7 +140,7 @@ $('#recommend-spot-button').addEventListener('click', async () => {
 });
 function displayProtectedAreas(geojson) { if(!map)return; const legend=$('#protected-legend'); protectedLayers.forEach(layer=>layer.setMap(null)); protectedLayers=[]; const addPolygon=(paths,name)=>{const layer=new naver.maps.Polygon({map,paths,zIndex:1,strokeColor:'#c94239',strokeWeight:1.5,strokeStyle:'shortdash',fillColor:'#e04f45',fillOpacity:.26}); naver.maps.Event.addListener(layer,'click',()=>toast(`⚠ ${name||'수산자원보호구역'}`)); protectedLayers.push(layer);}; if(!geojson.features?.length) { if(legend)legend.innerHTML='<span></span> 포획·출입 제한 구역 (예시)'; restrictedZones.forEach(zone=>addPolygon(zone.points.map(([lat,lng])=>new naver.maps.LatLng(lat,lng)),`예시 · ${zone.name}`)); return; } if(legend)legend.innerHTML='<span></span> 수산자원보호구역 (공식 WFS)'; geojson.features.forEach(feature=>{const geometry=feature.geometry||{};const name=feature.properties?.name||feature.properties?.NAME||'수산자원보호구역';const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.type==='MultiPolygon'?geometry.coordinates:[];polygons.forEach(polygon=>addPolygon(polygon[0].map(([lng,lat])=>new naver.maps.LatLng(lat,lng)),name));}); }
 async function enrichOfficialAddresses(){ const targets=spots.filter(spot=>isOfficialSpot(spot)&&spot.address==='공식 API 등록 포인트'); if(!targets.length)return; try { toast(`주소가 비어 있는 ${targets.length}개 포인트를 보완하고 있어요.`); const result=await fetch('/api/address-enrichment',{method:'POST'}).then(response=>response.json()); const refreshed=await fetch('/api/spots').then(response=>response.json()); const officialById=new Map((refreshed.items||[]).map(spot=>[String(spot.id),spot])); spots.forEach((spot,index)=>{const newer=officialById.get(String(spot.id));if(newer)spots[index]={...spot,...newer,source:'official'};}); renderSpots(); const reason=Array.isArray(result.errors)&&result.errors[0]; toast(result.updated?`${result.updated}개 포인트의 주소를 네이버 지도로 보완했어요.`:reason||'주소 보완 결과가 없습니다. 네이버 API 설정을 확인해주세요.'); } catch { toast('서버의 네이버 주소 보완을 시작하지 못했습니다. 서버를 다시 실행한 뒤 재시도해주세요.'); } }
-async function loadOfficialData() { try { const [spotsResponse, areasResponse] = await Promise.all([fetch('/api/spots'), fetch('/api/protected-areas')]); const official = await spotsResponse.json(); const areas = await areasResponse.json(); const known = new Set(spots.map(spot => `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`)); (official.items || []).forEach(spot => { const index = spots.findIndex(existing => String(existing.id) === String(spot.id)); const key = `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`; if(index >= 0) spots[index] = {...spots[index],...spot,source:'official'}; else if(!known.has(key)) spots.push({...spot,source:'official'}); }); renderSpots(); displayProtectedAreas(areas); await loadSpotRecommendations(); await enrichOfficialAddresses(); } catch { displayProtectedAreas({features:[]}); loadSpotRecommendations(); } }
+async function loadOfficialData() { try { const [spotsResponse, areasResponse] = await Promise.all([fetch('/api/spots'), fetch('/api/protected-areas')]); const official = await spotsResponse.json(); const areas = await areasResponse.json(); const known = new Set(spots.map(spot => `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`)); (official.items || []).forEach(spot => { const index = spots.findIndex(existing => String(existing.id) === String(spot.id)); const key = `${Number(spot.lat).toFixed(5)}:${Number(spot.lng).toFixed(5)}`; if(index >= 0) spots[index] = {...spots[index],...spot,source:'official'}; else if(!known.has(key)) spots.push({...spot,source:'official'}); }); renderSpots(); const requestedSpotId = new URLSearchParams(window.location.search).get('spot'); const requestedSpot = requestedSpotId && spots.find(spot => String(spot.id) === requestedSpotId); if (requestedSpot) { focusSpotOnMap(requestedSpot, 15, false); showSpotDetail(requestedSpot); } displayProtectedAreas(areas); await loadSpotRecommendations(); await enrichOfficialAddresses(); } catch { displayProtectedAreas({features:[]}); loadSpotRecommendations(); } }
 // 등록용 지도 안에서 장소를 찾고, 검색 결과는 이 지도만 이동시킨다.
 async function searchSpotLocation() {
   const query=$('#spot-location-query').value.trim(), results=$('#spot-location-results');
@@ -252,6 +251,8 @@ function openReport(kind, targetId) { if (!signedInUser) { showAuth(); toast('�
 $('#new-post-button').addEventListener('click', () => { if(!currentSpot) return; fillLoggedInAuthor(); $('#post-modal').showModal(); });
 $('#report-spot-button').addEventListener('click', () => { if(currentSpot) openReport('spot', currentSpot.id); });
 $('#open-inquiry-modal').addEventListener('click', () => $('#inquiry-modal').showModal());
+document.querySelectorAll('#open-spot-modal-hero,#open-spot-modal-bottom').forEach(button => button.addEventListener('click', () => $('#open-spot-modal').click()));
+$('#footer-inquiry-link').addEventListener('click', () => $('#open-inquiry-modal').click());
 async function apiError(response, fallback) { try { const result = await response.json(); return result.error || fallback; } catch { return fallback; } }
 async function imageDataUrl(file) { if(!file || !file.size) throw new Error('사진을 선택해 주세요.'); if(file.size > 50 * 1024 * 1024) throw new Error('사진은 50MB 이하만 업로드할 수 있습니다.'); return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);}); }
 async function uploadPostImage(file) { if(!file || !file.size) return ''; const dataUrl=await imageDataUrl(file); const response=await fetch('/api/community/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl})}); if(!response.ok) throw new Error(await apiError(response,'사진 업로드에 실패했습니다.')); return (await response.json()).imageUrl; }
@@ -558,9 +559,11 @@ function applySession(user) {
   profile.classList.toggle('is-admin', signedInUser?.role === 'admin');
   profile.innerHTML = signedInUser ? `${escapeHTML(signedInUser.displayName)}<span>${signedInUser.role === 'admin' ? '운영자' : '내 프로필'}</span>` : '로그인';
   profile.setAttribute('aria-label', signedInUser ? '내 프로필 및 로그아웃' : '로그인');
-  adminTab.hidden = signedInUser?.role !== 'admin';
-  memberCount.hidden = signedInUser?.role !== 'admin';
-  if (signedInUser?.role !== 'admin') memberCount.textContent = '회원 0명';
+  if (adminTab) adminTab.hidden = signedInUser?.role !== 'admin';
+  if (memberCount) {
+    memberCount.hidden = signedInUser?.role !== 'admin';
+    if (signedInUser?.role !== 'admin') memberCount.textContent = '회원 0명';
+  }
   fillLoggedInAuthor();
   // 추천 여부는 로그인한 사용자별로 달라지므로 세션 변경 직후 갱신한다.
   if (signedInUser) loadSpotRecommendations();
@@ -568,7 +571,7 @@ function applySession(user) {
     recommendedSpotIds = new Set();
     if (currentSpot) renderSpotRecommendation(currentSpot);
   }
-  if (signedInUser?.role === 'admin') loadAdminOverview();
+  if (signedInUser?.role === 'admin' && $('#admin-reports')) loadAdminOverview();
 }
 async function refreshSession() {
   try { const result = await fetch('/api/auth/me').then(response => response.json()); applySession(result.user); }
@@ -876,7 +879,7 @@ function adminReportItem(item) {
   return `<article class="admin-item"><b>${escapeHTML(item.kind || '신고')} · ${escapeHTML(item.reason || '사유 없음')} · ${status}</b><small>${escapeHTML(memberLabel(item, '신고자'))} · ${escapeHTML(item.message || '')}${item.admin_note ? ` · 메모: ${escapeHTML(item.admin_note)}` : ''}</small>${targetAction && item.target_id ? `<button type="button" data-admin-action="${targetAction}" data-admin-id="${escapeHTML(item.target_id)}">${targetLabel}</button>` : ''}${deleteButton}${item.status !== 'resolved' ? `<button type="button" data-admin-action="resolve-report" data-admin-id="${escapeHTML(item.id)}">처리 완료</button>` : ''}</article>`;
 }
 async function loadAdminOverview() {
-  if (signedInUser?.role !== 'admin') return;
+  if (signedInUser?.role !== 'admin' || !$('#admin-reports')) return;
   const response = await fetch('/api/admin/overview');
   const data = await response.json();
   if (!response.ok) return toast(data.error || '운영자 데이터를 불러오지 못했습니다.');
@@ -906,6 +909,6 @@ async function loadAdminOverview() {
     loadAdminOverview();
   }));
 }
-$('#admin-refresh').addEventListener('click', loadAdminOverview);
+if ($('#admin-refresh')) $('#admin-refresh').addEventListener('click', loadAdminOverview);
 refreshSession();
 openPasswordResetFromLink();

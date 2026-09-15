@@ -26,6 +26,13 @@
 - 배포 직후 GitHub Actions → `Daily official data sync` → Run workflow로 한 번 수동 실행하고, 로그의 JSON 결과에서 `errors: []`를 확인한다.
 - 500/503 오류, 동기화 실패, 스토리지 업로드 실패에 대한 알림을 배포 플랫폼 또는 모니터링 도구에서 설정한다.
 
+## 검색 노출(SEO) 점검
+
+- Render 환경 변수에 `PUBLIC_APP_URL`, `GOOGLE_SITE_VERIFICATION`, `NAVER_SITE_VERIFICATION`을 실제 공개 URL과 소유 확인 값으로 등록한다.
+- 배포 뒤 `/robots.txt`, `/sitemap.xml`, `/spots`, `/guides`, 개별 `/spot/...` URL이 200으로 열리고, `/admin/`은 운영자 로그인 없이는 열리지 않는지 확인한다.
+- Google Search Console과 네이버 서치어드바이저에 `https://실제도메인/sitemap.xml`을 제출한다. 도메인을 바꾸면 두 도구의 사이트 속성, Supabase Redirect URL, `PUBLIC_APP_URL`도 함께 변경한다.
+- Search Console URL 검사로 홈·목록·상세 페이지의 렌더링 HTML, canonical, robots 차단 여부와 구조화 데이터 경고를 확인한다.
+
 ## 현재 서버가 적용하는 기본 방어
 
 - HttpOnly, SameSite 로그인·갱신 쿠키와 토큰 자동 갱신

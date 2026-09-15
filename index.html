@@ -3,28 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="naver-site-verification" content="9c3002edcf6f268be31f7b871dc64ecec309c93d" />
-    <meta name="google-site-verification" content="sIgUJexDIs6tyfMNfteZZr50aJ_iop5C2HiyEtyyCj8" />
-    <title>물결포인트 | 낚시 포인트 공유</title>
-    <meta name="description" content="물결포인트에서 전국 낚시터와 낚시 포인트를 서로 공유하고 조과와 후기를 기록해보세요." />
+    <meta name="naver-site-verification" content="{{NAVER_SITE_VERIFICATION}}" />
+    <meta name="google-site-verification" content="{{GOOGLE_SITE_VERIFICATION}}" />
+    <title>전국 낚시 포인트 지도｜지역별 낚시터·최신 조과 – 물결포인트</title>
+    <meta name="description" content="전국 바다·민물 낚시 포인트를 지도에서 찾아보세요. 지역별 낚시터 정보, 대상 어종, 최신 조과와 이용 후기를 확인하고 내가 아는 포인트도 직접 공유할 수 있습니다." />
     <meta name="robots" content="index,follow" />
-    <link rel="canonical" href="https://wavepoint-aghq.onrender.com/" />
+    <meta name="googlebot" content="index,follow" />
+    <meta name="theme-color" content="#008b87" />
+    <link rel="canonical" href="{{CANONICAL_URL}}" />
+    <link rel="icon" type="image/png" href="/og-image.png" />
+    <link rel="apple-touch-icon" href="/og-image.png" />
     <meta property="og:locale" content="ko_KR" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="물결포인트" />
-    <meta property="og:title" content="물결포인트 | 낚시 포인트 공유" />
-    <meta property="og:description" content="전국 낚시터와 낚시 포인트를 서로 공유하고 조과를 경쟁해보세요." />
-    <meta property="og:url" content="https://wavepoint-aghq.onrender.com/" />
-    <meta property="og:image" content="https://wavepoint-aghq.onrender.com/og-image.png" />
+    <meta property="og:title" content="전국 낚시 포인트 지도｜지역별 낚시터·최신 조과 – 물결포인트" />
+    <meta property="og:description" content="전국 바다·민물 낚시 포인트를 지도에서 찾고, 지역별 낚시터 정보와 최신 조과를 확인해 보세요." />
+    <meta property="og:url" content="{{CANONICAL_URL}}" />
+    <meta property="og:image" content="{{SITE_URL}}/og-image.png" />
     <meta property="og:image:width" content="1730" />
     <meta property="og:image:height" content="909" />
     <meta property="og:image:alt" content="낚시꾼과 지도 핀, 물고기가 어우러진 물결포인트 일러스트" />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="물결포인트 | 낚시 포인트 공유" />
-    <meta name="twitter:description" content="전국 낚시터와 사용자 공유 포인트를 서로 공유하고 조과를 경쟁해보세요." />
-    <meta name="twitter:image" content="https://wavepoint-aghq.onrender.com/og-image.png" />
+    <meta name="twitter:title" content="전국 낚시 포인트 지도｜물결포인트" />
+    <meta name="twitter:description" content="전국 바다·민물 낚시 포인트와 최신 조과를 지도에서 확인하세요." />
+    <meta name="twitter:image" content="{{SITE_URL}}/og-image.png" />
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"WebSite","name":"물결포인트","url":"https://wavepoint-aghq.onrender.com/","inLanguage":"ko-KR","description":"전국 낚시터와 사용자 공유 포인트를 지도에서 찾고 조과를 기록하는 서비스"}
+      {"@context":"https://schema.org","@type":"WebSite","name":"물결포인트","url":"{{SITE_URL}}/","inLanguage":"ko-KR","description":"전국 바다·민물 낚시 포인트와 최신 조과를 찾아보고 공유하는 서비스"}
+    </script>
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"Organization","name":"물결포인트","url":"{{SITE_URL}}/","logo":"{{SITE_URL}}/og-image.png"}
+    </script>
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"내 주변 낚시 포인트는 어떻게 찾나요?","acceptedAnswer":{"@type":"Answer","text":"지도 탐색에서 지역 또는 포인트명을 검색한 뒤 목록이나 마커를 선택해 상세 정보를 확인할 수 있습니다."}},{"@type":"Question","name":"바다낚시와 민물낚시 포인트를 구분해서 볼 수 있나요?","acceptedAnswer":{"@type":"Answer","text":"지도 탐색의 민물과 바다 필터를 선택하면 유형별 포인트 목록을 확인할 수 있습니다."}},{"@type":"Question","name":"새로운 낚시 포인트는 어떻게 등록하나요?","acceptedAnswer":{"@type":"Answer","text":"로그인 후 포인트 공유하기를 선택하고, 검색 또는 지도에서 위치를 정한 뒤 포인트 이름과 소개를 입력해 등록합니다."}},{"@type":"Question","name":"조과 사진과 후기는 어떻게 공유하나요?","acceptedAnswer":{"@type":"Answer","text":"낚시터 상세 화면의 게시글·조과에서 사진, 어종, 길이와 후기를 등록할 수 있습니다."}},{"@type":"Question","name":"잘못된 낚시터 정보나 위험한 장소는 어떻게 알리나요?","acceptedAnswer":{"@type":"Answer","text":"포인트 상세의 낚시터 정보 신고 또는 문의·정보 제보를 이용해 운영자에게 알려주세요."}}]}
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -34,11 +44,12 @@
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="#top"><span class="brand-mark">≋</span>물결포인트 <span id="admin-member-count" class="admin-member-count" hidden>회원 0명</span></a>
+      <a class="brand" href="/"><span class="brand-mark">≋</span>물결포인트</a>
       <nav aria-label="주요 메뉴">
-        <button class="active" type="button" data-tab="map-section">지도 탐색</button>
-        <button type="button" data-tab="guide">이용 안내</button>
-        <button id="admin-tab" type="button" data-tab="admin-section" hidden>운영자 채널</button>
+        <a class="active" href="#map-section">낚시 포인트 찾기</a>
+        <a href="/spots">지역별 낚시터</a>
+        <a href="/catch-reports">최근 조과</a>
+        <a href="/guides">낚시 가이드</a>
       </nav>
       <button id="profile-button" class="profile" type="button" aria-label="로그인">로그인</button>
     </header>
@@ -47,10 +58,12 @@
       <section class="hero">
         <div>
           <p class="eyebrow">대한민국 낚시꾼의 물길</p>
-          <h1>좋은 포인트는<br /><em>함께</em> 발견할수록 빛나요.</h1>
-          <p class="hero-copy">내가 아는 낚시 포인트를 공유하고, 자신의 조과로<br />전국의 낚시꾼들과 겨뤄보세요.</p>
+          <h1>전국 낚시 포인트와 낚시터 정보를 한눈에 찾아보세요</h1>
+          <p class="hero-copy"><em>좋은 포인트는 함께 발견할수록 빛나요.</em></p>
+          <ul class="hero-benefits"><li>전국 바다·민물 낚시 포인트를 지도에서 빠르게 검색하세요.</li><li>지역별 낚시터의 대상 어종과 최신 조과를 확인하세요.</li><li>내가 아는 낚시 명소와 조과 사진을 공유해 보세요.</li></ul>
+          <p class="hero-actions"><a class="primary-button" href="#map-section" aria-label="낚시 포인트 지도 보기">내 주변 낚시 포인트 보기</a><button id="open-spot-modal-hero" class="outline-button" type="button">새 낚시 포인트 공유하기</button></p>
         </div>
-        <div class="hero-ranking-stack"><aside class="hero-ranking" aria-label="조과 랭킹"><div class="hero-ranking-head"><div><p>TOP CATCHES</p><h2>실시간 조과 랭킹</h2></div><button id="open-rank-catch-modal" type="button">조과 등록</button></div><div id="hero-ranking-list" class="hero-ranking-list"><p>랭킹을 불러오는 중…</p></div></aside><aside class="hero-ranking hero-spot-ranking" aria-label="추천 포인트 랭킹"><div class="hero-ranking-head"><div><p>TOP SPOTS</p><h2>추천 낚시 포인트</h2></div></div><div id="hero-spot-ranking-list" class="hero-ranking-list"><p>추천 포인트를 불러오는 중…</p></div></aside></div>
+        <div class="hero-ranking-stack"><aside class="hero-ranking" aria-label="조과 랭킹"><div class="hero-ranking-head"><div><p>TOP CATCHES</p><h2>조과 랭킹</h2></div><button id="open-rank-catch-modal" type="button">조과 등록</button></div><div id="hero-ranking-list" class="hero-ranking-list"><p>랭킹을 불러오는 중…</p></div></aside><aside class="hero-ranking hero-spot-ranking" aria-label="추천 포인트 랭킹"><div class="hero-ranking-head"><div><p>TOP SPOTS</p><h2>추천 낚시 포인트</h2></div></div><div id="hero-spot-ranking-list" class="hero-ranking-list"><p>추천 포인트를 불러오는 중…</p></div></aside></div>
       </section>
 
       <section id="map-section" class="map-section tab-panel">
@@ -70,8 +83,14 @@
         </div>
       </section>
 
-      <section id="guide" class="guide tab-panel" hidden><div><p class="eyebrow">HOW IT WORKS</p><h2>물결포인트를 즐기는 법</h2></div><ol><li><b>01</b><span>알고 있는 포인트를<br />지도에 남겨요.</span></li><li><b>02</b><span>오늘의 조과를 사진과<br />함께 기록해요.</span></li><li><b>03</b><span>실력으로 랭킹에<br />도전해요.</span></li></ol></section>
-      <section id="admin-section" class="admin-section tab-panel" hidden><div class="section-heading"><div><p class="eyebrow">ADMIN CHANNEL</p><h2>운영자 관리</h2></div><button id="admin-refresh" class="outline-button" type="button">새로고침</button></div><div class="admin-summary"><div><b id="admin-report-count">0</b><span>미처리 신고</span></div><div><b id="admin-inquiry-count">0</b><span>미처리 문의</span></div><div><b id="admin-spot-count">0</b><span>사용자 포인트</span></div></div><div class="admin-grid"><section><h3>신고 관리</h3><div id="admin-reports" class="admin-list"></div></section><section><h3>문의 · 정보 제보</h3><div id="admin-inquiries" class="admin-list"></div></section><section><h3>사용자 공유 포인트</h3><div id="admin-spots" class="admin-list"></div></section><section class="admin-audit-card"><h3>최근 운영 기록</h3><div id="admin-audits" class="admin-list"></div></section></div></section>
+      <section id="guide" class="guide tab-panel"><div><p class="eyebrow">HOW IT WORKS</p><h2>물결포인트를 즐기는 법</h2></div><ol><li><b>01</b><span>알고 있는 포인트를<br />지도에 남겨요.</span></li><li><b>02</b><span>오늘의 조과를 사진과<br />함께 기록해요.</span></li><li><b>03</b><span>실력으로 랭킹에<br />도전해요.</span></li></ol></section>
+      <section class="seo-content" aria-labelledby="seo-intro-title"><div class="seo-inner"><p class="eyebrow">FISHING SPOT GUIDE</p><h2 id="seo-intro-title">전국 낚시 포인트를 한눈에 찾아보세요</h2><p>물결포인트는 전국의 바다낚시와 민물낚시 장소를 지도에서 찾을 수 있는 낚시 정보 서비스입니다. 지역과 포인트명을 검색하고, 다른 낚시인이 공유한 포인트와 최신 낚시 조과를 살펴볼 수 있습니다.</p><div class="seo-columns"><section><h3>지역과 어종에 맞는 낚시터 검색</h3><p>원하는 지역과 어종을 기준으로 낚시 포인트를 찾아보세요. 포인트에 등록된 주소, 유형, 대상 어종과 이용자 게시글을 확인할 수 있습니다.</p><p><a href="/spots">전국 낚시터 목록 보기</a></p></section><section><h3>직접 발견한 낚시 포인트 공유</h3><p>직접 찾은 낚시 장소를 지도에 등록하고 현장 후기와 조과를 남겨보세요. 공개 전 출입 제한, 보호구역, 현지 규정을 반드시 확인해 주세요.</p><p><a href="#map-section">낚시 포인트 지도에서 찾아보기</a></p></section></div></div></section>
+      <section class="seo-content" aria-labelledby="region-spots-title"><div class="seo-inner"><p class="eyebrow">BY REGION</p><h2 id="region-spots-title">지역별 낚시 포인트</h2><p>자주 찾는 지역의 공개 낚시터와 낚시 포인트를 바로 확인하세요. 실제 등록된 정보만 각 지역 목록에 표시됩니다.</p><div class="seo-link-grid"><section><h3>부산 바다낚시 포인트</h3><a href="/spots/busan">부산 낚시 포인트 전체 보기</a></section><section><h3>인천 방파제 낚시 포인트</h3><a href="/spots/incheon">인천 낚시 포인트 전체 보기</a></section><section><h3>제주 갯바위 낚시 포인트</h3><a href="/spots/jeju">제주 낚시 포인트 전체 보기</a></section><section><h3>거제 낚시 포인트</h3><a href="/spots/geoje">거제 낚시 포인트 전체 보기</a></section><section><h3>강릉 낚시 포인트</h3><a href="/spots/gangneung">강릉 낚시 포인트 전체 보기</a></section></div></div></section>
+      <section class="seo-content" aria-labelledby="fish-spots-title"><div class="seo-inner"><p class="eyebrow">BY SPECIES</p><h2 id="fish-spots-title">어종별 낚시터 찾기</h2><p>목표 어종이 등록된 포인트를 기준으로 낚시터 정보를 찾아보세요.</p><div class="seo-link-grid"><section><h3>감성돔 낚시 포인트</h3><a href="/fish/black-sea-bream">감성돔 낚시터 추천 보기</a></section><section><h3>우럭·광어 낚시 포인트</h3><a href="/fish/rockfish">우럭 낚시터 추천 보기</a><a href="/fish/flounder">광어 낚시터 추천 보기</a></section><section><h3>배스 민물낚시 포인트</h3><a href="/fish/bass">배스 낚시 포인트 보기</a></section></div></div></section>
+      <section class="seo-content" aria-labelledby="recent-catch-title"><div class="seo-inner"><p class="eyebrow">COMMUNITY</p><h2 id="recent-catch-title">최근 등록된 낚시 조과</h2><p>이용자가 공개한 조과와 낚시 후기를 최신순으로 확인할 수 있습니다.</p><p><a class="primary-button content-link" href="/catch-reports">최근 등록된 낚시 조과 확인하기</a></p></div></section>
+      <section class="seo-content" aria-labelledby="share-title"><div class="seo-inner"><p class="eyebrow">SHARE A SPOT</p><h2 id="share-title">낚시 포인트를 공유해 보세요</h2><p>로그인 후 주소·낚시터명·지역을 검색하고 지도에서 정확한 위치를 선택해 포인트를 공유할 수 있습니다. 출입 제한과 보호구역, 현지 규정을 먼저 확인해 주세요.</p><button id="open-spot-modal-bottom" class="primary-button" type="button">새 낚시 포인트 공유하기</button></div></section>
+      <section class="seo-content" aria-labelledby="safety-title"><div class="seo-inner"><p class="eyebrow">SAFETY</p><h2 id="safety-title">안전한 낚시를 위한 안내</h2><p>구명조끼, 기상과 파고, 출입 통제, 야간 안전, 쓰레기 회수와 현지 규정을 확인하세요. 금어기와 금지 체장은 변동될 수 있으므로 출조 전 최신 공식 기준과 현장 표지판을 확인해야 합니다.</p><p><a class="primary-button content-link" href="/guides/safe-fishing-basics">낚시 안전수칙 확인하기</a></p></div></section>
+      <section class="seo-content seo-faq" aria-labelledby="faq-title"><div class="seo-inner"><p class="eyebrow">FAQ</p><h2 id="faq-title">낚시 포인트 자주 묻는 질문</h2><details><summary>내 주변 낚시 포인트는 어떻게 찾나요?</summary><p>지도 탐색에서 지역 또는 포인트명을 검색한 뒤 목록이나 마커를 선택해 상세 정보를 확인할 수 있습니다.</p></details><details><summary>바다낚시와 민물낚시 포인트를 구분해서 볼 수 있나요?</summary><p>지도 탐색의 민물과 바다 필터를 선택하면 유형별 포인트 목록을 확인할 수 있습니다.</p></details><details><summary>새로운 낚시 포인트는 어떻게 등록하나요?</summary><p>로그인 후 포인트 공유하기를 선택하고, 검색 또는 지도에서 위치를 정한 뒤 포인트 이름과 소개를 입력해 등록합니다.</p></details><details><summary>조과 사진과 후기는 어떻게 공유하나요?</summary><p>낚시터 상세 화면의 게시글·조과에서 사진, 어종, 길이와 후기를 등록할 수 있습니다.</p></details><details><summary>잘못된 낚시터 정보나 위험한 장소는 어떻게 알리나요?</summary><p>포인트 상세의 낚시터 정보 신고 또는 문의·정보 제보를 이용해 운영자에게 알려주세요.</p></details></div></section>
     </main>
 
     <dialog id="spot-modal" class="modal spot-modal-wide"><form id="spot-form"><div class="modal-header"><div><p class="eyebrow">NEW SPOT</p><h2>포인트 공유하기</h2></div><button class="close" type="button" data-close-modal="spot-modal" aria-label="닫기">×</button></div><div class="spot-location-search"><label>주소·낚시터·지역 검색<input id="spot-location-query" type="search" autocomplete="off" placeholder="예: 강화도, 청평호, 인천 중구" /></label><button id="spot-location-search-button" class="outline-button" type="button">검색</button></div><div id="spot-location-results" class="spot-location-results" hidden></div><p class="map-picker-guide">아래 지도를 클릭해 정확한 포인트 위치를 선택하세요.</p><div id="spot-picker-map" class="spot-picker-map" aria-label="포인트 위치 선택 지도"></div><p id="selected-location" class="location-note">현재 지도 중심 위치에 포인트가 등록됩니다.</p><p id="selected-address" class="location-note selected-address">주소를 확인하고 있어요…</p><input id="spot-address" name="address" type="hidden" /><label>포인트 이름<input required name="title" maxlength="32" placeholder="예: 해질녘 배스 포인트" /></label><label>구분<select name="kind"><option value="river">민물</option><option value="sea">바다</option></select></label><label>소개<textarea required name="description" maxlength="160" placeholder="수심, 잘 잡히는 시간대, 주의할 점을 알려주세요."></textarea></label><button class="primary-button" type="submit">공유하기</button></form></dialog>
@@ -116,7 +135,7 @@
       </div>
     </dialog>
             <div class="restricted-legend" id="protected-legend"><span></span> 포획·출입 제한 구역</div>
-    <footer class="legal-footer"><button data-open-policy="privacy-modal" type="button">개인정보처리방침</button><button data-open-policy="terms-modal" type="button">이용약관</button><button data-open-policy="location-modal" type="button">위치정보 안내</button><span>신고된 게시글·사진은 검토 후 숨김 또는 삭제될 수 있습니다.</span></footer>
+<footer class="legal-footer"><a href="#seo-intro-title">서비스 소개</a><a href="/spots">지역별 낚시 포인트</a><a href="/catch-reports">최근 등록된 낚시 조과</a><a href="/guides">낚시 안전수칙</a><button data-open-policy="privacy-modal" type="button">개인정보처리방침</button><button data-open-policy="terms-modal" type="button">이용약관</button><button data-open-policy="location-modal" type="button">위치정보 안내</button><button id="footer-inquiry-link" type="button">문의하기</button><span>신고된 게시글·사진은 검토 후 숨김 또는 삭제될 수 있습니다.</span></footer>
     <button id="open-inquiry-modal" class="inquiry-fab" type="button">문의 · 정보 제보</button><div id="toast" class="toast" role="status"></div>
     <script src="app.js?v=20260911-separated-region-clusters"></script>
   </body>
