@@ -26,16 +26,47 @@
   letter-spacing: -.7px;
 }
 
-.update-card ul {
+.update-items-rotator {
   margin: 0;
   padding-left: 19px;
   color: #52666a;
 }
 
-.update-card li {
+.update-rotator-item {
   margin: 6px 0;
   font-size: 13px;
   line-height: 1.7;
+}
+
+.has-update-rotator .update-items-rotator {
+  display: grid;
+  list-style-position: inside;
+}
+
+.has-update-rotator .update-rotator-item {
+  grid-area: 1 / 1;
+  margin: 0;
+  opacity: 0;
+  transform: translateY(9px);
+  pointer-events: none;
+  transition: opacity .42s ease, transform .42s ease;
+}
+
+.has-update-rotator .update-rotator-item.is-active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.latest-update .update-items-rotator {
+  margin-top: 6px;
+  color: #52666a;
+  font-size: 12px;
+}
+
+.latest-update .update-rotator-item {
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 @media (max-width: 760px) {

@@ -662,6 +662,11 @@ def korean_update_date(value):
     except (TypeError, ValueError):
         return str(value or "")
 
+def update_items_rotator(items):
+    """JS가 없으면 목록 전체를, 있으면 한 항목씩 순환해 보여 주는 마크업이다."""
+    rows = "".join(f'<li class="update-rotator-item">{html_escape(item)}</li>' for item in items)
+    return f'<ul class="update-items-rotator" data-update-rotator>{rows}</ul>'
+
 def seo_document(title, description, canonical_path, body, schemas, robots="index,follow"):
     site = public_site_url()
     canonical = f"{site}{canonical_path}"
@@ -672,8 +677,8 @@ def seo_document(title, description, canonical_path, body, schemas, robots="inde
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="google-site-verification" content="{google_verification}"><meta name="naver-site-verification" content="{naver_verification}"><title>{html_escape(title)}</title><meta name="description" content="{html_escape(description)}"><meta name="robots" content="{robots}"><meta name="googlebot" content="{robots}"><meta name="theme-color" content="#008b87"><link rel="canonical" href="{html_escape(canonical)}"><link rel="icon" type="image/png" sizes="512x512" href="{site}/favicon.png"><link rel="apple-touch-icon" href="{site}/favicon.png">
 <meta property="og:locale" content="ko_KR"><meta property="og:type" content="website"><meta property="og:site_name" content="물결포인트"><meta property="og:title" content="{html_escape(title)}"><meta property="og:description" content="{html_escape(description)}"><meta property="og:url" content="{html_escape(canonical)}"><meta property="og:image" content="{site}/og-image-v2.png"><meta property="og:image:type" content="image/png"><meta property="og:image:width" content="1734"><meta property="og:image:height" content="907"><meta property="og:image:alt" content="낚싯대와 바다 물결로 표현한 물결포인트 로고"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{html_escape(title)}"><meta name="twitter:description" content="{html_escape(description)}"><meta name="twitter:image" content="{site}/og-image-v2.png">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/seo-pages.css"><link rel="stylesheet" href="/updates.css">{json_ld}</head>
-<body><header class="seo-header"><a class="seo-brand" href="/"><span>≋</span> 물결포인트</a><nav aria-label="주요 메뉴"><a href="/">낚시 포인트 찾기</a><a href="/posts">게시글</a><a href="/guides">안전 수칙</a></nav></header><main class="seo-main">{body}</main><footer class="seo-footer"><a href="/">낚시 포인트 지도</a><a href="/posts">낚시 게시글</a><a href="/guides/safe-fishing-basics">낚시 안전수칙</a><a href="/updates">업데이트 기록</a><a href="/sitemap.xml">사이트맵</a><span>출조 전 현지 규정과 안전 안내를 최신 기준으로 확인하세요.</span></footer></body></html>'''
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/seo-pages.css"><link rel="stylesheet" href="/updates.css?v=20260921-update-rotator">{json_ld}</head>
+<body><header class="seo-header"><a class="seo-brand" href="/"><span>≋</span> 물결포인트</a><nav aria-label="주요 메뉴"><a href="/">낚시 포인트 찾기</a><a href="/posts">게시글</a><a href="/guides">안전 수칙</a></nav></header><main class="seo-main">{body}</main><footer class="seo-footer"><a href="/">낚시 포인트 지도</a><a href="/posts">낚시 게시글</a><a href="/guides/safe-fishing-basics">낚시 안전수칙</a><a href="/updates">업데이트 기록</a><a href="/sitemap.xml">사이트맵</a><span>출조 전 현지 규정과 안전 안내를 최신 기준으로 확인하세요.</span></footer><script src="/updates.js?v=20260921-update-rotator"></script></body></html>'''
 
 def seo_breadcrumb(items):
     site = public_site_url()
@@ -762,8 +767,8 @@ def seo_updates_page(path="/updates"):
     crumbs, crumb_schema = seo_breadcrumb([("홈", "/"), ("업데이트 기록", path)])
     cards = []
     for update in updates:
-        items = "".join(f"<li>{html_escape(item)}</li>" for item in update["items"])
-        cards.append(f'<article class="update-card"><time datetime="{html_escape(update["date"], quote=True)}">{html_escape(korean_update_date(update["date"]))}</time><h2>{html_escape(update["title"])}</h2><ul>{items}</ul></article>')
+        items = update_items_rotator(update["items"])
+        cards.append(f'<article class="update-card"><time datetime="{html_escape(update["date"], quote=True)}">{html_escape(korean_update_date(update["date"]))}</time><h2>{html_escape(update["title"])}</h2>{items}</article>')
     cards_html = "".join(cards) or '<p class="empty-state">아직 등록된 업데이트 기록이 없습니다.</p>'
     description = "물결포인트의 기능 개선, 오류 수정과 서비스 업데이트 기록을 확인하세요."
     body = f'{crumbs}<header class="page-heading"><p>WEEKLY UPDATE</p><h1>업데이트 기록</h1><p>매주 반영한 기능 개선과 오류 수정 내용을 투명하게 안내합니다.</p></header><section class="update-list" aria-label="업데이트 내역">{cards_html}</section>'
@@ -910,7 +915,7 @@ class Handler(SimpleHTTPRequestHandler):
     def serve_main_page(self):
         content = (ROOT / "index.html").read_text(encoding="utf-8")
         updates = product_updates()
-        latest = updates[0] if updates else {"date": "", "title": "새로운 업데이트를 준비하고 있습니다."}
+        latest = updates[0] if updates else {"date": "", "title": "새로운 업데이트를 준비하고 있습니다.", "items": ["새로운 소식은 업데이트 기록에서 확인할 수 있습니다."]}
         replacements = {
             "{{SITE_URL}}": public_site_url(), "{{CANONICAL_URL}}": f"{public_site_url()}/",
             "{{GOOGLE_SITE_VERIFICATION}}": os.environ.get("GOOGLE_SITE_VERIFICATION", ""),
@@ -920,6 +925,7 @@ class Handler(SimpleHTTPRequestHandler):
             "{{LATEST_UPDATE_TITLE}}": latest["title"],
         }
         for marker, value in replacements.items(): content = content.replace(marker, html_escape(value, quote=True))
+        content = content.replace("{{LATEST_UPDATE_ITEMS}}", update_items_rotator(latest["items"]))
         self.send_html(content)
 
     def serve_sitemap(self):

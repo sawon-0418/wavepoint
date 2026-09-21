@@ -42,6 +42,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="overrides.css?v=20260921-weekly-updates" />
+    <link rel="stylesheet" href="updates.css?v=20260921-update-rotator" />
   </head>
   <body>
     <header class="topbar">
@@ -67,7 +68,7 @@
       </section>
 
       <section class="latest-update" aria-labelledby="latest-update-title">
-        <div class="latest-update-inner"><p class="eyebrow">WEEKLY UPDATE</p><time datetime="{{LATEST_UPDATE_ISO}}">{{LATEST_UPDATE_DATE}}</time><h2 id="latest-update-title">{{LATEST_UPDATE_TITLE}}</h2><a href="/updates">전체 업데이트 기록 보기 →</a></div>
+        <div class="latest-update-inner"><div class="latest-update-copy"><div class="latest-update-meta"><p class="eyebrow">WEEKLY UPDATE</p><time datetime="{{LATEST_UPDATE_ISO}}">{{LATEST_UPDATE_DATE}}</time></div><h2 id="latest-update-title">{{LATEST_UPDATE_TITLE}}</h2>{{LATEST_UPDATE_ITEMS}}</div><a href="/updates">전체 업데이트 기록 보기 →</a></div>
       </section>
 
       <section id="map-section" class="map-section tab-panel">
@@ -134,5 +135,6 @@
 <footer class="legal-footer"><a href="#top">서비스 소개</a><a href="/posts">낚시 게시글</a><a href="/guides">낚시 안전수칙</a><a href="/updates">업데이트 기록</a><button data-open-policy="privacy-modal" type="button">개인정보처리방침</button><button data-open-policy="terms-modal" type="button">이용약관</button><button data-open-policy="location-modal" type="button">위치정보 안내</button><button id="footer-inquiry-link" type="button">문의하기</button><span>신고된 게시글·사진은 검토 후 숨김 또는 삭제될 수 있습니다.</span></footer>
     <button id="open-inquiry-modal" class="inquiry-fab" type="button">문의 · 정보 제보</button><div id="toast" class="toast" role="status"></div>
     <script src="app.js?v=20260911-separated-region-clusters"></script>
+    <script src="updates.js?v=20260921-update-rotator"></script>
   </body>
 </html>
