@@ -26,13 +26,15 @@
   letter-spacing: -.7px;
 }
 
-.update-items-rotator {
+.update-items-rotator,
+.update-items-list {
   margin: 0;
   padding-left: 19px;
   color: #52666a;
 }
 
-.update-rotator-item {
+.update-rotator-item,
+.update-items-list li {
   margin: 6px 0;
   font-size: 13px;
   line-height: 1.7;
