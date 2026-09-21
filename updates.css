@@ -1,0 +1,45 @@
+.update-list {
+  display: grid;
+  gap: 14px;
+  max-width: 860px;
+}
+
+.update-card {
+  position: relative;
+  padding: 24px 26px 24px 146px;
+  border: 1px solid #dce4da;
+  background: #fffdf8;
+}
+
+.update-card time {
+  position: absolute;
+  top: 27px;
+  left: 26px;
+  color: #008b87;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.update-card h2 {
+  margin: 0 0 12px;
+  font-size: 19px;
+  letter-spacing: -.7px;
+}
+
+.update-card ul {
+  margin: 0;
+  padding-left: 19px;
+  color: #52666a;
+}
+
+.update-card li {
+  margin: 6px 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+@media (max-width: 760px) {
+  .update-card { padding: 20px; }
+  .update-card time { position: static; display: block; margin-bottom: 8px; }
+  .update-card h2 { font-size: 17px; }
+}

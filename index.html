@@ -41,7 +41,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="overrides.css?v=20260911-map-hint-position" />
+    <link rel="stylesheet" href="overrides.css?v=20260921-weekly-updates" />
   </head>
   <body>
     <header class="topbar">
@@ -64,6 +64,10 @@
           <p class="hero-actions"><a class="primary-button" href="#map-section" aria-label="낚시 포인트 지도 보기">낚시 포인트 맵 보기</a><button id="open-spot-modal-hero" class="primary-button" type="button">낚시 포인트 공유하기</button><a class="primary-button" href="/posts" aria-label="낚시 게시글과 조과 후기 보기">게시글 보러가기</a></p>
         </div>
         <div class="hero-ranking-stack"><aside class="hero-ranking" aria-label="조과 랭킹"><div class="hero-ranking-head"><div><p>TOP CATCHES</p><h2>조과 랭킹</h2></div><button id="open-rank-catch-modal" type="button">조과 등록</button></div><div id="hero-ranking-list" class="hero-ranking-list"><p>랭킹을 불러오는 중…</p></div></aside><aside class="hero-ranking hero-spot-ranking" aria-label="추천 포인트 랭킹"><div class="hero-ranking-head"><div><p>TOP SPOTS</p><h2>추천 낚시 포인트</h2></div></div><div id="hero-spot-ranking-list" class="hero-ranking-list"><p>추천 포인트를 불러오는 중…</p></div></aside></div>
+      </section>
+
+      <section class="latest-update" aria-labelledby="latest-update-title">
+        <div class="latest-update-inner"><p class="eyebrow">WEEKLY UPDATE</p><time datetime="{{LATEST_UPDATE_ISO}}">{{LATEST_UPDATE_DATE}}</time><h2 id="latest-update-title">{{LATEST_UPDATE_TITLE}}</h2><a href="/updates">전체 업데이트 기록 보기 →</a></div>
       </section>
 
       <section id="map-section" class="map-section tab-panel">
@@ -127,7 +131,7 @@
       </div>
     </dialog>
             <div class="restricted-legend" id="protected-legend" hidden><span></span> 수산자원보호구역 (공식 WFS)</div>
-<footer class="legal-footer"><a href="#top">서비스 소개</a><a href="/posts">낚시 게시글</a><a href="/guides">낚시 안전수칙</a><button data-open-policy="privacy-modal" type="button">개인정보처리방침</button><button data-open-policy="terms-modal" type="button">이용약관</button><button data-open-policy="location-modal" type="button">위치정보 안내</button><button id="footer-inquiry-link" type="button">문의하기</button><span>신고된 게시글·사진은 검토 후 숨김 또는 삭제될 수 있습니다.</span></footer>
+<footer class="legal-footer"><a href="#top">서비스 소개</a><a href="/posts">낚시 게시글</a><a href="/guides">낚시 안전수칙</a><a href="/updates">업데이트 기록</a><button data-open-policy="privacy-modal" type="button">개인정보처리방침</button><button data-open-policy="terms-modal" type="button">이용약관</button><button data-open-policy="location-modal" type="button">위치정보 안내</button><button id="footer-inquiry-link" type="button">문의하기</button><span>신고된 게시글·사진은 검토 후 숨김 또는 삭제될 수 있습니다.</span></footer>
     <button id="open-inquiry-modal" class="inquiry-fab" type="button">문의 · 정보 제보</button><div id="toast" class="toast" role="status"></div>
     <script src="app.js?v=20260911-separated-region-clusters"></script>
   </body>
