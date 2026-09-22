@@ -336,7 +336,7 @@ $('#post-form').addEventListener('submit', async event => {
       body: JSON.stringify({spotId:currentSpot.id, author:data.get('author') || '익명 낚시꾼', content:data.get('content'), imageUrl, species:data.get('species'), length:length ? Number(length) : null, lengthIsAi:false})
     });
   }, '게시글과 조과가 등록되었습니다.', '게시글 저장에 실패했습니다.');
-  if (saved) loadSpotPosts(currentSpot.id);
+  if (saved) { loadSpotPosts(currentSpot.id); loadHeroRanking(); }
 });
 $('#post-edit-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -437,6 +437,7 @@ function userCatchRanking(posts) {
   return [...bestByUser.values()].sort((left, right) => Number(right.length) - Number(left.length));
 }
 async function loadHeroRanking() {
+  loadSpeciesRanking();
   const list=$('#hero-ranking-list');
   try {
     const result=await fetch('/api/community').then(response=>response.json());
@@ -451,6 +452,45 @@ async function loadHeroRanking() {
     }));
   } catch { list.innerHTML='<p>랭킹을 불러오지 못했습니다.</p>'; }
 }
+let speciesRankingRequest = 0;
+async function loadSpeciesRanking() {
+  const picker = $('#ranking-species'), list = $('#species-ranking-list');
+  if (!picker || !list) return;
+  const request = ++speciesRankingRequest;
+  const selected = picker.value;
+  list.innerHTML = '<p>랭킹을 불러오는 중…</p>';
+  try {
+    const response = await fetch(`/api/species-rankings${selected ? `?speciesId=${encodeURIComponent(selected)}` : ''}`);
+    const result = await response.json();
+    if (request !== speciesRankingRequest) return;
+    if (!response.ok) throw new Error(result.error || '랭킹을 불러오지 못했습니다.');
+    const species = result.species || [];
+    picker.innerHTML = species.length ? species.map(item => `<option value="${escapeHTML(item.id)}">${escapeHTML(item.name)}</option>`).join('') : '<option value="">등록된 어종 없음</option>';
+    picker.disabled = !species.length;
+    picker.value = result.selectedSpeciesId || '';
+    const row = (post, mine = false) => `<button class="hero-rank${mine ? ' species-my-rank' : ''}" type="button" data-species-post="${escapeHTML(post.id)}"><b>${mine ? `현재 내 순위: ${post.rank}위` : `${post.rank}위`}</b><span>${escapeHTML(post.author || '낚시꾼')}${post.length_is_ai ? ' · AI 추정' : ''}</span><strong>${Number(post.length).toFixed(1)} <small>cm</small></strong></button>`;
+    const top = result.top || [];
+    list.innerHTML = top.length ? top.map(post => row(post)).join('') : '<p>이 어종의 조과를 등록해 첫 랭킹에 도전해 보세요.</p>';
+    if (result.viewerId) list.innerHTML += result.myRank ? row(result.myRank, true) : '<p class="my-rank-empty">아직 이 어종의 내 조과 기록이 없습니다.</p>';
+    const posts = [...top, ...(result.myRank ? [result.myRank] : [])];
+    list.querySelectorAll('[data-species-post]').forEach(button => button.addEventListener('click', () => {
+      const post = posts.find(item => String(item.id) === button.dataset.speciesPost);
+      if (post) openRankedCatch(post);
+    }));
+    let options = $('#known-fish-species');
+    if (!options) { options = document.createElement('datalist'); options.id = 'known-fish-species'; document.body.append(options); }
+    options.innerHTML = species.map(item => `<option value="${escapeHTML(item.name)}"></option>`).join('');
+    document.querySelectorAll('input[name="species"]').forEach(input => input.setAttribute('list', options.id));
+  } catch (error) {
+    if (request !== speciesRankingRequest) return;
+    if (!picker.value) { picker.innerHTML = '<option value="">어종 목록을 불러오지 못했습니다</option>'; picker.disabled = true; }
+    list.replaceChildren();
+    const message = document.createElement('p'); message.textContent = error.message; list.append(message);
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'text-button'; retry.textContent = '다시 불러오기'; retry.addEventListener('click', loadSpeciesRanking); list.append(retry);
+  }
+}
+$('#ranking-species')?.addEventListener('change', loadSpeciesRanking);
+
 function loadSpotRanking() {
   const list = $('#hero-spot-ranking-list');
   if (!list) return;
@@ -495,6 +535,7 @@ function updateRankSpotAddress() {
 function openRankCatchModal() {
   if (!signedInUser) { showAuth(); toast('로그인 후 조과를 등록할 수 있습니다.'); return; }
   fillLoggedInAuthor();
+  loadSpeciesRanking();
   $('#rank-spot-picker').value = '';
   $('#rank-spot-id').value = '';
   renderRankSpotOptions();

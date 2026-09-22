@@ -134,4 +134,81 @@ values ('post-images', 'post-images', true, 52428800, array['image/jpeg','image/
 on conflict (id) do nothing;
 update storage.buckets set file_size_limit = 52428800 where id = 'post-images';
 
+-- 어종별 조과 랭킹: 이 줄부터 마지막 줄까지 기존 DB에도 추가 실행할 수 있습니다.
+begin;
+create table if not exists public.fish_species (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  normalized_name text not null unique check (normalized_name <> ''),
+  created_at timestamptz not null default now()
+);
+alter table public.fish_species enable row level security;
+revoke all on public.fish_species from public, anon, authenticated;
+grant select, insert, update, delete on public.fish_species to service_role;
+alter table public.posts add column if not exists species_id uuid references public.fish_species(id);
+
+-- UNIQUE와 UPSERT로 동시 등록에도 같은 어종이 중복 생성되지 않습니다.
+-- 띄어쓰기·대소문자는 통합하지만 우럭/조피볼락 같은 별칭은 자동 추측하지 않습니다.
+create or replace function public.link_post_species() returns trigger
+language plpgsql set search_path = '' as $$
+declare species_key text;
+begin
+  species_key := lower(regexp_replace(coalesce(new.species, ''), '[[:space:]]+', '', 'g'));
+  if species_key = '' then
+    new.species_id := null;
+    new.species := null;
+  else
+    if char_length(species_key) > 30 then
+      raise exception '어종은 30자 이내로 입력해 주세요.';
+    end if;
+    insert into public.fish_species(name, normalized_name)
+    values (regexp_replace(new.species, '[[:space:]]+', '', 'g'), species_key)
+    on conflict (normalized_name) do update set normalized_name = excluded.normalized_name
+    returning id, name into new.species_id, new.species;
+  end if;
+  return new;
+end; $$;
+revoke all on function public.link_post_species() from public, anon, authenticated;
+grant execute on function public.link_post_species() to service_role;
+drop trigger if exists posts_link_species on public.posts;
+create trigger posts_link_species before insert or update of species, species_id
+on public.posts for each row execute function public.link_post_species();
+-- 기존 게시글도 분류합니다. 제목·사진·길이·작성자는 보존합니다.
+update public.posts set species = species where species_id is null and nullif(btrim(species), '') is not null;
+create index if not exists posts_species_ranking_idx on public.posts(species_id, length desc) where is_hidden = false;
+
+create or replace view public.species_catch_rankings with (security_invoker = true) as
+with personal_best as (
+  select p.*, row_number() over (
+    partition by p.species_id, p.author_id
+    order by p.length desc, p.created_at asc, p.id asc
+  ) as personal_order
+  from public.posts p
+  where p.is_hidden = false and p.author_id is not null and p.species_id is not null
+    and p.length > 0 and p.length <= 300
+    and not exists (select 1 from public.community_spots s where s.id::text = p.spot_id and s.is_hidden)
+)
+select id, spot_id, author_id, author, species_id, species, length, length_is_ai, created_at,
+  rank() over (partition by species_id order by length desc) as rank
+from personal_best where personal_order = 1;
+revoke all on public.species_catch_rankings from public, anon, authenticated;
+grant select on public.species_catch_rankings to service_role;
+
+create or replace function public.get_species_rankings(p_species_id uuid default null, p_viewer_id uuid default null)
+returns jsonb language sql stable set search_path = '' as $$
+  with chosen as (
+    select coalesce(p_species_id, (select id from public.fish_species order by name, id limit 1)) as id
+  ), ranked as (
+    select r.* from public.species_catch_rankings r where r.species_id = (select id from chosen)
+  )
+  select jsonb_build_object(
+    'species', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'name', name) order by name, id) from public.fish_species), '[]'::jsonb),
+    'selectedSpeciesId', (select id from chosen),
+    'top', coalesce((select jsonb_agg(to_jsonb(t) order by t.rank, t.created_at, t.id) from (select * from ranked order by rank, created_at, id limit 5) t), '[]'::jsonb),
+    'myRank', (select to_jsonb(r) from ranked r where r.author_id = p_viewer_id limit 1)
+  );
+$$;
+revoke all on function public.get_species_rankings(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.get_species_rankings(uuid, uuid) to service_role;
 notify pgrst, 'reload schema';
+commit;

@@ -259,6 +259,24 @@ def upload_post_image(data_url):
             raise RuntimeError(f"사진 업로드에 실패했습니다. (HTTP {retry_error.code}: {detail})") from retry_error
     return f"{url}/storage/v1/object/public/post-images/{name}"
 
+def catch_fields(payload):
+    species = payload.get("species") or ""
+    if not isinstance(species, str) or len(species.strip()) > 30:
+        raise ValueError("어종은 30자 이내로 입력해 주세요.")
+    species = species.strip()
+    length = payload.get("length")
+    if length is not None and length != "":
+        try:
+            if isinstance(length, bool): raise ValueError
+            length = float(length)
+            if not math.isfinite(length) or not 1 <= length <= 300: raise ValueError
+        except (TypeError, ValueError):
+            raise ValueError("물고기 길이는 1~300cm 사이의 숫자로 입력해 주세요.")
+        if not species: raise ValueError("조과 길이를 등록하려면 어종을 입력해 주세요.")
+    else:
+        length = None
+    return {"species": species, "length": length}
+
 def read_json(name, fallback):
     path = DATA / name
     if not path.exists(): return fallback
@@ -1105,6 +1123,23 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json({"id": user_id, "displayName": display_name, "totalCatches": len(catches), "topCatches": catches[:5]})
             except RuntimeError as error:
                 return self.send_json({"error": str(error)}, 503)
+        if path == "/api/species-rankings":
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            species_id = query.get("speciesId", [""])[0]
+            try:
+                if species_id: species_id = str(uuid.UUID(species_id))
+            except ValueError:
+                return self.send_json({"error": "올바른 어종을 선택해 주세요."}, 400)
+            viewer = self.session_user()
+            try:
+                result = supabase_request("rpc/get_species_rankings", "POST", {
+                    "p_species_id": species_id or None,
+                    "p_viewer_id": viewer["id"] if viewer else None,
+                })
+                result["viewerId"] = viewer["id"] if viewer else None
+                return self.send_json(result)
+            except RuntimeError:
+                return self.send_json({"error": "어종별 랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."}, 503)
         if self.path.startswith("/api/community"):
             query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             spot_id = query.get("spotId", [""])[0]
@@ -1370,6 +1405,11 @@ class Handler(SimpleHTTPRequestHandler):
             except (ValueError, json.JSONDecodeError):
                 return self.send_json({"error": "잘못된 요청입니다."}, 400)
             action = self.path.rsplit("/", 1)[-1]
+            if action in ("post", "update-post"):
+                try:
+                    payload.update(catch_fields(payload))
+                except ValueError as error:
+                    return self.send_json({"error": str(error)}, 400)
             try:
                 if action == "upload":
                     if not self.require_rate_limit(user, "upload", 10, 3600): return
