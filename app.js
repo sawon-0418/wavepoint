@@ -454,7 +454,7 @@ async function loadHeroRanking() {
 }
 let speciesRankingRequest = 0;
 let speciesRotationTimer;
-let speciesRotationPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let speciesRotationPaused = false;
 let speciesRankingLoading = false;
 let speciesCatalog = [];
 let activeRankingSpecies = '';
@@ -470,13 +470,15 @@ function scheduleSpeciesRotation() {
   button.disabled = speciesCatalog.length < 2;
   button.textContent = speciesRotationPaused ? '자동 순환 시작' : '자동 순환 멈춤';
   button.setAttribute('aria-pressed', String(!speciesRotationPaused));
+  const status = $('#species-rotation-status');
+  if (status) status.textContent = speciesRotationPaused ? '자동 순환 멈춤' : button.disabled ? '어종이 2개 이상이면 자동 순환합니다' : '자동 순환 중 · 8초 간격';
   list.setAttribute('aria-live', speciesRotationPaused ? 'polite' : 'off');
   if (speciesRotationPaused || speciesRankingLoading || speciesSearchEditing || !activeRankingSpecies || button.disabled || document.hidden) return;
   speciesRotationTimer = setTimeout(() => {
     const card = picker.closest('.species-ranking');
     const bounds = card.getBoundingClientRect();
     // 목록을 조작하거나 다른 창을 읽는 동안에는 어종을 바꾸지 않는다.
-    if (card.matches(':hover') || card.contains(document.activeElement) || document.querySelector('dialog[open]') || bounds.bottom <= 0 || bounds.top >= window.innerHeight) {
+    if ((card.contains(document.activeElement) && document.activeElement !== button) || document.querySelector('dialog[open]') || bounds.bottom <= 0 || bounds.top >= window.innerHeight) {
       scheduleSpeciesRotation();
       return;
     }

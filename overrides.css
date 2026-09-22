@@ -1,3 +1,4 @@
+.hero h1 { word-break: keep-all; overflow-wrap: break-word; }
 header.topbar nav { gap: 17px; }
 header.topbar nav a { position:relative; display:inline-flex; align-items:center; min-height:38px; padding:8px 4px; color:#52666a; white-space:nowrap; transition:color .18s; }
 header.topbar nav a + a::before { content:"|"; position:absolute; left:-11px; top:50%; color:#c5cdca; font-weight:400; transform:translateY(-52%); pointer-events:none; }
