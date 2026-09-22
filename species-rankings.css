@@ -1,13 +1,13 @@
-.species-ranking-picker {
+.species-ranking-search {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   margin-top: 12px;
   font-size: 12px;
   font-weight: 700;
 }
-.species-ranking-picker select {
+.species-ranking-search > div { display: flex; gap: 6px; }
+.species-ranking-search input {
   width: 100%;
   min-width: 0;
   padding: 8px;
@@ -17,6 +17,19 @@
   color: #102a32;
   font: inherit;
 }
+.species-ranking-search button,
+.species-join-button {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border: 1px solid #008b87;
+  border-radius: 4px;
+  background: #008b87;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.species-join-button { width: 100%; margin: 6px 0; }
 .species-ranking-help {
   margin: 8px 0 0;
   color: #637479;
@@ -31,3 +44,23 @@
   border-top: 1px dashed #9bc6ba;
 }
 .species-my-rank b { grid-column: 1 / -1; }
+.species-rotation-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 8px;
+  color: #637479;
+  font-size: 10px;
+}
+.species-rotation-controls button {
+  padding: 5px 7px;
+  border: 1px solid #b9d7d1;
+  border-radius: 4px;
+  background: #fff;
+  color: #007d79;
+  font: inherit;
+  cursor: pointer;
+}
+.species-rotation-controls button:disabled { opacity: .5; cursor: default; }

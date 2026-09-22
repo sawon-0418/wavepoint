@@ -453,21 +453,95 @@ async function loadHeroRanking() {
   } catch { list.innerHTML='<p>랭킹을 불러오지 못했습니다.</p>'; }
 }
 let speciesRankingRequest = 0;
-async function loadSpeciesRanking() {
+let speciesRotationTimer;
+let speciesRotationPaused = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let speciesRankingLoading = false;
+let speciesCatalog = [];
+let activeRankingSpecies = '';
+let speciesSearchTerm = null;
+let speciesSearchEditing = false;
+const speciesNameKey = value => String(value).replace(/\s+/g, '').toLowerCase();
+const speciesRankingCache = new Map();
+function scheduleSpeciesRotation() {
+  clearTimeout(speciesRotationTimer);
+  const picker = $('#ranking-species'), button = $('#species-rotation-toggle'), list = $('#species-ranking-list');
+  if (!picker || !button) return;
+  button.hidden = false;
+  button.disabled = speciesCatalog.length < 2;
+  button.textContent = speciesRotationPaused ? '자동 순환 시작' : '자동 순환 멈춤';
+  button.setAttribute('aria-pressed', String(!speciesRotationPaused));
+  list.setAttribute('aria-live', speciesRotationPaused ? 'polite' : 'off');
+  if (speciesRotationPaused || speciesRankingLoading || speciesSearchEditing || !activeRankingSpecies || button.disabled || document.hidden) return;
+  speciesRotationTimer = setTimeout(() => {
+    const card = picker.closest('.species-ranking');
+    const bounds = card.getBoundingClientRect();
+    // 목록을 조작하거나 다른 창을 읽는 동안에는 어종을 바꾸지 않는다.
+    if (card.matches(':hover') || card.contains(document.activeElement) || document.querySelector('dialog[open]') || bounds.bottom <= 0 || bounds.top >= window.innerHeight) {
+      scheduleSpeciesRotation();
+      return;
+    }
+    const index = speciesCatalog.findIndex(item => item.id === activeRankingSpecies);
+    activeRankingSpecies = speciesCatalog[(index + 1) % speciesCatalog.length].id;
+    speciesSearchTerm = null;
+    loadSpeciesRanking({automatic: true});
+  }, 8000);
+}
+async function loadSpeciesRanking({automatic = false} = {}) {
   const picker = $('#ranking-species'), list = $('#species-ranking-list');
   if (!picker || !list) return;
+  clearTimeout(speciesRotationTimer);
+  speciesRankingLoading = true;
+  if (!automatic) speciesRankingCache.clear();
   const request = ++speciesRankingRequest;
-  const selected = picker.value;
+  const selected = activeRankingSpecies;
   list.innerHTML = '<p>랭킹을 불러오는 중…</p>';
   try {
-    const response = await fetch(`/api/species-rankings${selected ? `?speciesId=${encodeURIComponent(selected)}` : ''}`);
-    const result = await response.json();
+    const cached = speciesRankingCache.get(selected);
+    let result;
+    if (automatic && cached && Date.now() - cached.savedAt < 60000) {
+      result = cached.result;
+    } else {
+      const response = await fetch(`/api/species-rankings${selected ? `?speciesId=${encodeURIComponent(selected)}` : ''}`);
+      result = await response.json();
+      if (request !== speciesRankingRequest) return;
+      if (!response.ok) throw new Error(result.error || '랭킹을 불러오지 못했습니다.');
+      speciesRankingCache.set(result.selectedSpeciesId || '', {result, savedAt: Date.now()});
+    }
     if (request !== speciesRankingRequest) return;
-    if (!response.ok) throw new Error(result.error || '랭킹을 불러오지 못했습니다.');
     const species = result.species || [];
-    picker.innerHTML = species.length ? species.map(item => `<option value="${escapeHTML(item.id)}">${escapeHTML(item.name)}</option>`).join('') : '<option value="">등록된 어종 없음</option>';
-    picker.disabled = !species.length;
-    picker.value = result.selectedSpeciesId || '';
+    speciesCatalog = species;
+    let options = $('#known-fish-species');
+    if (!options) { options = document.createElement('datalist'); options.id = 'known-fish-species'; document.body.append(options); }
+    options.innerHTML = species.map(item => `<option value="${escapeHTML(item.name)}"></option>`).join('');
+    document.querySelectorAll('input[name="species"]').forEach(input => input.setAttribute('list', options.id));
+    if (speciesSearchTerm !== null) {
+      const match = species.find(item => speciesNameKey(item.name) === speciesNameKey(speciesSearchTerm));
+      if (!match) {
+        activeRankingSpecies = '';
+        speciesRankingLoading = false;
+        speciesRotationPaused = true;
+        list.innerHTML = `<p><strong>${escapeHTML(speciesSearchTerm)}</strong>의 등록된 어종 정보를 찾지 못했습니다. 이 어종의 첫 조과를 등록하고 랭킹에 참여해 보세요.</p><button class="species-join-button" type="button">이 어종의 조과 등록하기</button><p class="species-ranking-help">조과를 저장하면 어종과 랭킹이 함께 등록됩니다.</p>`;
+        const searched = speciesSearchTerm;
+        list.querySelector('.species-join-button').addEventListener('click', () => {
+          const url = new URL(window.location.href);
+          url.searchParams.set('action', 'rank-catch');
+          url.searchParams.set('rank-species', searched);
+          window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+          openRankCatchFromQuery();
+        });
+        scheduleSpeciesRotation();
+        return;
+      }
+      if (result.selectedSpeciesId !== match.id) {
+        const response = await fetch(`/api/species-rankings?speciesId=${encodeURIComponent(match.id)}`);
+        result = await response.json();
+        if (request !== speciesRankingRequest) return;
+        if (!response.ok) throw new Error(result.error || '랭킹을 불러오지 못했습니다.');
+        speciesRankingCache.set(match.id, {result, savedAt: Date.now()});
+      }
+    }
+    activeRankingSpecies = result.selectedSpeciesId || '';
+    if (!speciesSearchEditing) picker.value = species.find(item => item.id === activeRankingSpecies)?.name || '';
     const row = (post, mine = false) => `<button class="hero-rank${mine ? ' species-my-rank' : ''}" type="button" data-species-post="${escapeHTML(post.id)}"><b>${mine ? `현재 내 순위: ${post.rank}위` : `${post.rank}위`}</b><span>${escapeHTML(post.author || '낚시꾼')}${post.length_is_ai ? ' · AI 추정' : ''}</span><strong>${Number(post.length).toFixed(1)} <small>cm</small></strong></button>`;
     const top = result.top || [];
     list.innerHTML = top.length ? top.map(post => row(post)).join('') : '<p>이 어종의 조과를 등록해 첫 랭킹에 도전해 보세요.</p>';
@@ -477,19 +551,42 @@ async function loadSpeciesRanking() {
       const post = posts.find(item => String(item.id) === button.dataset.speciesPost);
       if (post) openRankedCatch(post);
     }));
-    let options = $('#known-fish-species');
-    if (!options) { options = document.createElement('datalist'); options.id = 'known-fish-species'; document.body.append(options); }
-    options.innerHTML = species.map(item => `<option value="${escapeHTML(item.name)}"></option>`).join('');
-    document.querySelectorAll('input[name="species"]').forEach(input => input.setAttribute('list', options.id));
+    speciesRankingLoading = false;
+    scheduleSpeciesRotation();
   } catch (error) {
     if (request !== speciesRankingRequest) return;
-    if (!picker.value) { picker.innerHTML = '<option value="">어종 목록을 불러오지 못했습니다</option>'; picker.disabled = true; }
+    speciesRankingLoading = false;
+    speciesRotationPaused = true;
     list.replaceChildren();
     const message = document.createElement('p'); message.textContent = error.message; list.append(message);
     const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'text-button'; retry.textContent = '다시 불러오기'; retry.addEventListener('click', loadSpeciesRanking); list.append(retry);
+    scheduleSpeciesRotation();
   }
 }
-$('#ranking-species')?.addEventListener('change', loadSpeciesRanking);
+$('#species-search-form')?.addEventListener('submit', event => {
+  event.preventDefault();
+  const input = $('#ranking-species');
+  speciesSearchTerm = input.value.trim() || null;
+  speciesSearchEditing = false;
+  loadSpeciesRanking();
+});
+$('#ranking-species')?.addEventListener('input', () => {
+  speciesSearchEditing = true;
+  ++speciesRankingRequest;
+  speciesRankingLoading = false;
+  clearTimeout(speciesRotationTimer);
+});
+$('#species-rotation-toggle')?.addEventListener('click', () => {
+  speciesRotationPaused = !speciesRotationPaused;
+  if (!speciesRotationPaused) {
+    speciesSearchTerm = null;
+    speciesSearchEditing = false;
+    loadSpeciesRanking();
+    return;
+  }
+  scheduleSpeciesRotation();
+});
+document.addEventListener('visibilitychange', scheduleSpeciesRotation);
 
 function loadSpotRanking() {
   const list = $('#hero-spot-ranking-list');
@@ -532,7 +629,7 @@ function updateRankSpotAddress() {
   note.classList.toggle('address-unavailable', unavailable);
   note.textContent = unavailable ? '주소 미제공 · 지도에서 위치를 확인한 뒤 포인트 정보를 보완해 주세요.' : `주소: ${spot.address}`;
 }
-function openRankCatchModal() {
+function openRankCatchModal(speciesName = '') {
   if (!signedInUser) { showAuth(); toast('로그인 후 조과를 등록할 수 있습니다.'); return; }
   fillLoggedInAuthor();
   loadSpeciesRanking();
@@ -542,6 +639,7 @@ function openRankCatchModal() {
   const note = $('#rank-address-note');
   note.classList.remove('address-unavailable');
   note.textContent = '포인트명이나 지역을 검색한 뒤 목록에서 선택해 주세요.';
+  if (typeof speciesName === 'string' && speciesName) $('#rank-catch-form [name="species"]').value = speciesName.slice(0, 30);
   $('#rank-catch-modal').showModal();
 }
 let rankCatchQueryScheduled = false;
@@ -554,9 +652,12 @@ function openRankCatchFromQuery() {
   rankCatchQueryScheduled = true;
   const openWhenMapReady = () => {
     if (!map) return setTimeout(openWhenMapReady, 100);
+    const speciesName = url.searchParams.get('rank-species') || '';
     url.searchParams.delete('action');
+    url.searchParams.delete('rank-species');
     window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
-    openRankCatchModal();
+    rankCatchQueryScheduled = false;
+    openRankCatchModal(speciesName);
   };
   openWhenMapReady();
 }

@@ -41,7 +41,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="species-rankings.css?v=20260922" />
+    <link rel="stylesheet" href="species-rankings.css?v=20260922-search" />
     <link rel="stylesheet" href="overrides.css?v=20260921-weekly-updates" />
     <link rel="stylesheet" href="updates.css?v=20260921-static-history" />
   </head>
@@ -69,7 +69,8 @@
           <aside class="hero-ranking" aria-label="조과 랭킹"><div class="hero-ranking-head"><div><p>TOP CATCHES</p><h2>조과 랭킹</h2></div><button id="open-rank-catch-modal" type="button">조과 등록</button></div><div id="hero-ranking-list" class="hero-ranking-list"><p>랭킹을 불러오는 중…</p></div></aside>
           <aside class="hero-ranking species-ranking" aria-labelledby="species-ranking-title">
             <div class="hero-ranking-head"><div><p>TOP BY SPECIES</p><h2 id="species-ranking-title">어종별 조과 랭킹</h2></div></div>
-            <label class="species-ranking-picker" for="ranking-species">어종 선택<select id="ranking-species" disabled><option value="">불러오는 중…</option></select></label>
+            <form id="species-search-form" class="species-ranking-search" role="search" aria-label="어종별 랭킹 검색"><label for="ranking-species">어종 검색</label><div><input id="ranking-species" type="search" list="known-fish-species" maxlength="30" placeholder="예: 배스, 우럭" autocomplete="off" /><button type="submit">검색</button></div></form>
+            <div class="species-rotation-controls"><span>8초마다 다음 어종 표시</span><button id="species-rotation-toggle" type="button" aria-controls="species-ranking-list" hidden>자동 순환 멈춤</button></div>
             <p class="species-ranking-help">어종별 개인 최고 길이 TOP 5 · 같은 길이는 공동 순위</p>
             <div id="species-ranking-list" class="hero-ranking-list" aria-live="polite"><p>랭킹을 불러오는 중…</p></div>
           </aside>
@@ -144,7 +145,7 @@
             <div class="restricted-legend" id="protected-legend" hidden><span></span> 수산자원보호구역 (공식 WFS)</div>
 <footer class="legal-footer"><a href="#top">서비스 소개</a><a href="/posts">낚시 게시글</a><a href="/guides">낚시 안전수칙</a><a href="/updates">업데이트 기록</a><button data-open-policy="privacy-modal" type="button">개인정보처리방침</button><button data-open-policy="terms-modal" type="button">이용약관</button><button data-open-policy="location-modal" type="button">위치정보 안내</button><button id="footer-inquiry-link" type="button">문의하기</button><span>신고된 게시글·사진은 검토 후 숨김 또는 삭제될 수 있습니다.</span></footer>
     <button id="open-inquiry-modal" class="inquiry-fab" type="button">문의 · 정보 제보</button><div id="toast" class="toast" role="status"></div>
-    <script src="app.js?v=20260922-species-rankings"></script>
+    <script src="app.js?v=20260922-species-search"></script>
     <script src="updates.js?v=20260921-update-rotator"></script>
   </body>
 </html>
